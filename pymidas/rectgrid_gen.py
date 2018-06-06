@@ -3,7 +3,7 @@
 
  This work is licensed under the Creative Commons
  Attribution-NonCommercial-ShareAlike 3.0 Unported License.
- To view a copy of this license, visit   
+ To view a copy of this license, visit
  http://creativecommons.org/licenses/by-nc-sa/3.0/
  or send a letter to Creative Commons, 444 Castro Street,
  Suite 900, Mountain View, California, 94041, USA.
@@ -33,12 +33,118 @@ class supergrid(object):
       >>> hash=hashlib.md5(sgrid.x)
       >>> print hash.hexdigest()
       0960e0376d9b5639f4b78ed7b5518c25
-      
+
 
       """
-      
+
       self.yDir = 1
-      
+
+      if file is not None:
+        f=netCDF4.Dataset(file)
+        vdict={}
+        self.x=f.variables['x'][:]
+        self.y=f.variables['y'][:]
+        try:
+          self.dx=f.variables['dx'][:]
+          self.have_metrics=True
+        except:
+          self.have_metrics=False
+        if self.have_metrics:
+          self.dy=f.variables['dy'][:]
+          self.area=f.variables['area'][:]
+          self.angle_dx=f.variables['angle_dx'][:]
+        self.grid_x=self.x[0,:]
+        self.grid_y=self.y[:,0]
+        units=getattr(f.variables['x'],'units')
+        if units == 'meters':
+          self.is_cartesian=True
+          self.is_latlon=False
+        else:
+          self.is_cartesian=False
+          self.is_latlon=True
+
+        vdict['cyclic_x']=cyclic_x
+        vdict['cyclic_y']=cyclic_y
+        vdict['tripolar_n']=tripolar_n
+        vdict['nxtot']=self.x.shape[1]
+        vdict['nytot']=self.x.shape[0]
+        vdict['axis_units']=f.variables['x'].units
+        try:
+          vdict['axis_units']=f.variables['x'].radius
+        except:
+          vdict['radius']=6371.e3
+
+        self.dict=dict.copy(vdict)
+
+        return
+
+      if xdat is not None:
+        if ydat is not None:
+          vdict={}
+          vdict['nxtot']=xdat.shape[1]-1
+          vdict['nytot']=ydat.shape[0]-1
+          vdict['config']=config
+          vdict['axis_units']=axis_units
+          vdict['ystart']=ydat.min()
+          vdict['leny']=ydat.max()-ydat.min()
+          vdict['xstart']=xdat.min()
+          vdict['lenx']=xdat.max()-xdat.min()
+          vdict['cyclic_x']=cyclic_x
+          vdict['cyclic_y']=cyclic_y
+          vdict['tripolar_n']=tripolar_n
+          vdict['displaced_pole']=displace_pole
+          vdict['r0_pole']=r0_pole
+          vdict['lon0_pole']=lon0_pole
+          vdict['doughnut']=doughnut
+          vdict['radius']=radius
+
+          jind=numpy.arange(vdict['nytot']);iind=numpy.arange(vdict['nxtot'])
+          jindp=numpy.arange(vdict['nytot']+1);iindp=numpy.arange(vdict['nxtot']+1)
+          self.grid_y=vdict['ystart']+jindp*vdict['leny']/vdict['nytot']
+          self.grid_x=vdict['xstart']+iindp*vdict['lenx']/vdict['nxtot']
+
+          self.x=xdat
+          self.y=ydat
+
+          if displace_pole:
+            r,phi = self.displaced_pole(r0_pole,lon0_pole,excluded_fraction=doughnut)
+            print ('phi.shape=',phi.shape)
+            print ('r.shape=',r.shape)
+            self.x=phi.copy()
+#            self.x[:-1,-1]=self.x[:-1,-1]+360.
+            self.y=r.copy()
+            self.grid_x = self.x[-1,:]
+#            self.grid_x[-1]=self.grid_x[-1]+360.0
+            self.grid_y=self.y[:,nxtot//4]
+            vdict['nxtot']=self.grid_x.shape[0]-1
+            vdict['nytot']=self.grid_y.shape[0]-1
+
+          self.is_cartesian=False
+          self.is_latlon=False
+          if vdict['config'] == 'cartesian':
+            self.is_cartesian = True
+          else:
+            self.is_latlon = True
+
+          self.dict=dict.copy(vdict)
+
+          if tripolar_n:
+            self.lon_bpnp=self.grid_x[0]
+            self.join_lat=self.grid_y[0]
+            self.rp=numpy.tan(0.5*(0.5*numpy.pi - (self.grid_y[0])*PI_180))
+            lon,lat=self.tp_trans()
+            self.x=lon
+            self.y=lat
+
+          self.have_metrics = False
+
+          return
+
+        else:
+
+          print (""" Both xdat,ydat need to be defined if one is""")
+          return None
+
       vdict={}
       vdict['nxtot']=nxtot
       vdict['nytot']=nytot
@@ -56,20 +162,20 @@ class supergrid(object):
       vdict['r0_pole']=r0_pole
       vdict['lon0_pole']=lon0_pole
       vdict['doughnut']=doughnut
-      
+
       if config=='mercator':
         vdict['isotropic']=True
       else:
         vdict['isotropic']=False
-        
+
       self.dict=dict.copy(vdict)
-        
+
       jind=numpy.arange(nytot);iind=numpy.arange(nxtot)
-      jindp=numpy.arange(nytot+1);iindp=numpy.arange(nxtot+1)        
+      jindp=numpy.arange(nytot+1);iindp=numpy.arange(nxtot+1)
 
       if config == 'cartesian':
         self.is_cartesian=True
-        self.is_latlon=False        
+        self.is_latlon=False
         self.grid_y=ystart+jindp*leny/nytot
         self.grid_x=xstart+iindp*lenx/nxtot
         self.x=numpy.tile(self.grid_x,(nytot+1,1))
@@ -83,7 +189,7 @@ class supergrid(object):
         self.y=numpy.tile(self.grid_y.reshape((nytot+1,1)),(1,nxtot+1))
       elif config == 'mercator':
         self.is_cartesian=False
-        self.is_latlon=True             
+        self.is_latlon=True
         jRef=numpy.floor(-nytot*ystart/leny)
         fnRef=self.Int_dj_dy(0.0)
         y0=ystart*PI_180
@@ -100,7 +206,7 @@ class supergrid(object):
       if tripolar_n:
         self.lon_bpnp=self.grid_x[0]
         self.join_lat=self.grid_y[0]
-        self.rp=numpy.tan(0.5*(0.5*numpy.pi - (self.grid_y[0])*PI_180))            
+        self.rp=numpy.tan(0.5*(0.5*numpy.pi - (self.grid_y[0])*PI_180))
         lon,lat=self.tp_trans()
         self.x=lon
         self.y=lat
@@ -113,16 +219,16 @@ class supergrid(object):
         self.grid_x = self.x[-1,:]
  #       self.grid_x[-1]=self.grid_x[-1]+360.0
         self.grid_y=self.y[:,nxtot/4]
-        
+
       self.dict['nxtot']=self.grid_x.shape[0]-1
       self.dict['nytot']=self.grid_y.shape[0]-1
-        
+
       self.have_metrics = False
-        
+
   def dy_dj(self,y):
     """
     Returns the grid increment in the j direction given y in radians
- 
+
     >>> from midas.rectgrid_gen import *
     >>> import hashlib
     >>> sgrid=supergrid(360,180,'mercator','degrees',-60.,120.,0.,360.)
@@ -130,7 +236,7 @@ class supergrid(object):
     >>> hash=hashlib.md5(dydj)
     >>> print hash.hexdigest()
     bb119dc580e9847bc3ef6ca9237b5f0d
-   
+
     """
     nxtot=self.dict['nxtot'];nytot=self.dict['nytot']
     lenx=self.dict['lenx'];leny=self.dict['leny']
@@ -140,13 +246,13 @@ class supergrid(object):
       dydj=C0*numpy.cos(y)
     else:
       dydj=PI_180*leny/nytot
-      
+
     return dydj
 
   def ds_dj(self,y):
     """
     Returns the grid increment in the j direction given y in radians
- 
+
     >>> from midas.rectgrid_gen import *
     >>> import hashlib
     >>> sgrid=supergrid(360,180,'mercator','degrees',-60.,120.,0.,360.)
@@ -155,7 +261,7 @@ class supergrid(object):
     >>> print hash.hexdigest()
     ea1fe561e2aeb7cec82520ef7c5e2ed2
 
-   
+
     """
 
     dsdj=self.dict['radius']*self.dy_dj(y)
@@ -165,7 +271,7 @@ class supergrid(object):
   def dx_di(self,x):
     """
     Returns the grid increment in the i direction
- 
+
     >>> from midas.rectgrid_gen import *
     >>> import hashlib
     >>> sgrid=supergrid(360,180,'mercator','degrees',-60.,120.,0.,360.)
@@ -178,11 +284,11 @@ class supergrid(object):
     >>> print hash.hexdigest()
     ea1fe561e2aeb7cec82520ef7c5e2ed2
 
-   
+
     """
 
     dxdi=PI_180*self.dict['lenx']/self.dict['nxtot']
-    
+
     return dxdi
 
   def ds_di(self,x,y):
@@ -190,7 +296,8 @@ class supergrid(object):
     Returns the grid spacing in the i direction
  
 
-   
+
+
     """
 
     dsdi=self.dict['radius']*numpy.cos(y)*self.dx_di(x)
@@ -200,13 +307,13 @@ class supergrid(object):
   def dL(self,x1,x2,y1,y2):
     """
 
-    Calculate the contribution from the line integral along one 
-    of the four sides of a cell face to the area of a cell, 
+    Calculate the contribution from the line integral along one
+    of the four sides of a cell face to the area of a cell,
     assuming that the sides follow a linear path in latitude and
     longitude.
 
     """
-        
+
     dy=y2-y1
 
     if numpy.abs(dy) > 2.5e-8:
@@ -218,8 +325,8 @@ class supergrid(object):
 
     return dl
 
-    
-    
+
+
 
   def Int_di_dx(self,x):
     """
@@ -235,8 +342,8 @@ class supergrid(object):
   def Int_dj_dy(self,y):
     """
     Calculates and returns the integral of the inverse
-    of dy/dj to the point y, in radians.        
-    
+    of dy/dj to the point y, in radians.
+
     """
 
     if self.dict['isotropic']:
@@ -250,10 +357,10 @@ class supergrid(object):
     else:
       I_C0=self.dict['nytot']/self.dict['leny']/PI_180
       r=I_C0*y
-            
+
     return r
-              
-                                           
+
+
   def find_root_y(self,fnval,y1,ymin,ymax,ittmax):
     """
     Finds and returns the value of y at which the
@@ -266,6 +373,7 @@ class supergrid(object):
     y=y1;ybot=y1
     fnbot=self.Int_dj_dy(ybot)-fnval
     itt=0
+
 
     while fnbot > 0.0:
       if (ybot-2.0*self.dy_dj(ybot)) < 0.5*(ybot+ymin):
@@ -280,7 +388,7 @@ class supergrid(object):
         print ("""
               Unable to find bottom bound for grid function""")
         raise
-        
+
     if y+2.0*self.dy_dj(y) < 0.5*(y+ymax):
       ytop  = y + 2.0*self.dy_dj(y)
     else:
@@ -332,55 +440,55 @@ class supergrid(object):
 
   def bp_colat(self):
 
-    
+
     d=mdist(self.x,self.lon_bpnp)
     phi=d*PI_180
 
 
     return phi
-    
+
   def bp_lon(self):
-        
+
 # Co-latitudes of rotated grid sphere
     chi=2.0*numpy.arctan(numpy.tan(0.5*(0.5*numpy.pi-self.y*PI_180))/self.rp)
 # Base grid longitude
     lam = 0.5*numpy.pi - chi
 
     nxtot=self.dict['nxtot']
-    lam[:,:nxtot/2]=lam[:,:nxtot/2]-numpy.pi/2
-    lam[:,nxtot/2:]=numpy.pi/2-lam[:,nxtot/2:]
-    
+    lam[:,:nxtot//2]=lam[:,:nxtot//2]-numpy.pi/2
+    lam[:,nxtot//2:]=numpy.pi/2-lam[:,nxtot//2:]
+
     return lam
 
   def tp_trans(self):
-    
+
     nytot=self.dict['nytot']
-    nxtot=self.dict['nxtot']        
-        
+    nxtot=self.dict['nxtot']
+
     lamc=self.bp_lon()
     phic=self.bp_colat()
-        
+
     chic=numpy.arccos(numpy.sin(phic)*numpy.cos(lamc))
-    gamma=numpy.arctan(numpy.tan(phic)*numpy.sin(lamc))        
+    gamma=numpy.arctan(numpy.tan(phic)*numpy.sin(lamc))
     lat=2.0*numpy.arctan(self.rp*numpy.tan(chic/2.0))
     lat=lat/PI_180
     lat=90.-lat
     lon=gamma/PI_180
 
-    lon[:,:nxtot/4]=-lon[:,:nxtot/4]
-    lon[:,nxtot/4]=90.0
-    lon[:,nxtot/4+1:nxtot/2]=180.0-lon[:,nxtot/4+1:nxtot/2]
-    lon[:,nxtot/2]=180.
-    lon[:,nxtot/2+1:3*nxtot/4]=180.0-lon[:,nxtot/2+1:3*nxtot/4]
-    lon[:,3*nxtot/4]=270.
-    lon[:,3*nxtot/4+1:]=360.-lon[:,3*nxtot/4+1:]
+    lon[:,:nxtot//4]=-lon[:,:nxtot//4]
+    lon[:,nxtot//4]=90.0
+    lon[:,nxtot//4+1:nxtot//2]=180.0-lon[:,nxtot//4+1:nxtot//2]
+    lon[:,nxtot//2]=180.
+    lon[:,nxtot//2+1:3*nxtot//4]=180.0-lon[:,nxtot//2+1:3*nxtot//4]
+    lon[:,3*nxtot//4]=270.
+    lon[:,3*nxtot//4+1:]=360.-lon[:,3*nxtot//4+1:]
 
     lon=lon+self.lon_bpnp
-        
+
     return lon,lat
 
   def displaced_pole(self,ra2,phia,excluded_fraction=None,pole=-1,verbose=False):
-    
+
     """
     Displace the pole of the grid to (ra2,phia) with an option
     to exclude a portion of the grid nearest the pole
@@ -393,7 +501,7 @@ class supergrid(object):
     -833161.400782 -60.0 -89.4690265487
 
 
-    
+
     """
 
     if pole == -1:
@@ -420,7 +528,7 @@ class supergrid(object):
     a=numpy.complex(ra2*numpy.cos(PI_180*-phia),ra2*numpy.sin(PI_180*-phia))
 
     phi=self.x
-    
+
     lon0 = phi[0,0]
 
     ny,nx=self.x.shape
@@ -472,7 +580,7 @@ class supergrid(object):
             cot_tgt=0.0
           else:
             cot_tgt = 1.0/numpy.tan(th_1)
-                    
+
           if th_1>=0.0:
             if cot_tgt >=0.0:
               th_min = 0.0; th_max = theta_chg.copy()
@@ -528,16 +636,18 @@ class supergrid(object):
 
       
 
-    
+
+
     jmin=0;jmax=ny
     if excluded_fraction is not None:
       if pole == -1:
         jmin=numpy.ceil(ny*excluded_fraction)
         jmin=jmin+numpy.mod(jmin,2)
-        return r_out[jmin:,:], phi_out[jmin:,:]        
+        jmint = int(jmin)
+        return r_out[jmint:,:], phi_out[jmint:,:]
       else:
         jmax=numpy.ceil(ny*(1.0 - excluded_fraction))
-        return r_out[:jmax,:], phi_out[:jmax,:]                
+        return r_out[:jmax,:], phi_out[:jmax,:]
     else:
       return r_out,phi_out
 
@@ -545,22 +655,22 @@ class supergrid(object):
   def bound_grid_y(self,y_bnds,verbose=False):
 
     y0=numpy.nonzero(self.grid_y >= y_bnds[0])[0][0]
-    y1=numpy.nonzero(self.grid_y <= y_bnds[1])[0][-1]    
+    y1=numpy.nonzero(self.grid_y <= y_bnds[1])[0][-1]
     y1=y1+numpy.mod(y1-y0,2)
-    
+
 
     if verbose:
       print ('Truncating grid at latitudes= ',y_bnds[0],y_bnds[1])
       print ('Truncating grid at y indices= ',y0,y1)
 
 
-    
+
     if self.have_metrics:
       self.y=self.y[y0:y1+1,:]
       self.x=self.x[y0:y1+1,:]
       self.dx=self.dx[y0:y1+2,:]
       self.dy=self.dy[y0:y1+2,:]
-      self.angle_dx=self.angle_dz[y0:y1+2,:]                  
+      self.angle_dx=self.angle_dx[y0:y1+2,:]
       self.grid_y=self.y[:,0]
       self.dict['nytot']=self.grid_y.shape[0]-1
     else:
@@ -568,15 +678,15 @@ class supergrid(object):
       self.x=self.x[y0:y1+1,:]
       self.grid_y=self.y[:,0]
       self.dict['nytot']=self.grid_y.shape[0]-1
-          
+
   def merge_grid(self,grid2):
 
     self.x=numpy.concatenate((self.x,grid2.x),axis=0)
     self.y=numpy.concatenate((self.y,grid2.y),axis=0)
-    self.dx=numpy.concatenate((self.dx,grid2.dx),axis=0)                
+    self.dx=numpy.concatenate((self.dx,grid2.dx),axis=0)
     self.dy=numpy.concatenate((self.dy,grid2.dy),axis=0)
     self.area=numpy.concatenate((self.area,grid2.area),axis=0)
-    self.angle_dx=numpy.concatenate((self.angle_dx,numpy.take(grid2.angle_dx,[0],axis=0)),axis=0)    
+    self.angle_dx=numpy.concatenate((self.angle_dx,numpy.take(grid2.angle_dx,[0],axis=0)),axis=0)
     self.angle_dx=numpy.concatenate((self.angle_dx,grid2.angle_dx),axis=0)
     self.grid_y=self.y[:,0]
     self.dict['nytot']=self.grid_y.shape[0]-1
@@ -586,25 +696,25 @@ class supergrid(object):
     from midas import generic_grid
 
     grid=generic_grid(supergrid=self)
-      
-    
+
+
   def grid_metrics(self):
 
 
     nytot=self.dict['nytot']
     nxtot=self.dict['nxtot']
-        
+
     if  self.dict['axis_units'] == 'm':
       metric=1.0
-    if  self.dict['axis_units'] == 'km':            
+    if  self.dict['axis_units'] == 'km':
       metric=1.e3
-    if  self.dict['axis_units'] == 'degrees':                        
+    if  self.dict['axis_units'] == 'degrees':
       metric=self.dict['radius']*PI_180
 
 
     Re = self.dict['radius']
     ymid_j = 0.5*(self.y+numpy.roll(self.y,shift=-1,axis=0))
-    ymid_i = 0.5*(self.y+numpy.roll(self.y,shift=-1,axis=1))      
+    ymid_i = 0.5*(self.y+numpy.roll(self.y,shift=-1,axis=1))
     dy_j = numpy.roll(self.y,shift=-1,axis=0) - self.y
     dy_i = numpy.roll(self.y,shift=-1,axis=1) - self.y
     dx_i = mdist(numpy.roll(self.x,shift=-1,axis=1),self.x)
@@ -617,10 +727,18 @@ class supergrid(object):
     self.dy=self.dy[:-1,:]
 
     self.area=self.dx[:-1,:]*self.dy[:,:-1]
-    self.angle_dx=numpy.zeros((nytot,nxtot))
+    self.angle_dx=numpy.zeros(self.x.shape)
 
-    self.angle_dx = numpy.arctan2(dy_i,dx_i)*180.0/numpy.pi
-      
+#    self.angle_dx = numpy.arctan2(dy_i,dx_i)*180.0/numpy.pi
+
+    # The commented out code above was incorrect for non-Cartesian grids
+    # The corrected version, in addition to including spherical metrics, is centered in the interior and one-sided at the grid edges
+    self.angle_dx[:,1:-1] = numpy.arctan2(self.y[:,2:]-self.y[:,:-2],(self.x[:,2:]-self.x[:,:-2])*numpy.cos(numpy.deg2rad(self.y[:,1:-1])))
+    self.angle_dx[:,0] = numpy.arctan2(self.y[:,1]-self.y[:,0],(self.x[:,1]-self.x[:,0])*numpy.cos(numpy.deg2rad(self.y[:,0])))
+    self.angle_dx[:,-1] = numpy.arctan2(self.y[:,-1]-self.y[:,-2],(self.x[:,-1]-self.x[:,-2])*numpy.cos(numpy.deg2rad(self.y[:,-1])))
+    self.angle_dx = self.angle_dx * 180.0/numpy.pi
+
+
     self.have_metrics = True
 
 
@@ -632,17 +750,17 @@ class supergrid(object):
     """
     if path is not None:
       f=netCDF4.Dataset(path)
-            
+
     if field in f.variables:
       self.mask = f.variables[field][:]
     else:
       print (' Field ',field,' is not present in file ',path)
       return None
-    
+
 
     return None
-            
-    
+
+
 
   def extract(self,geo_region=None):
     if geo_region is None:
@@ -651,7 +769,7 @@ class supergrid(object):
     else:
       print ("""Supergrid extraction not supported yet """)
       return None
-      
+
   def write_nc(self,fnam=None,format='NETCDF3_CLASSIC'):
     import netCDF4 as nc
 
@@ -666,12 +784,12 @@ class supergrid(object):
     nyp=f.createDimension('nyp',len(self.grid_y))
     nxp=f.createDimension('nxp',len(self.grid_x))
     ny=f.createDimension('ny',len(self.grid_y)-1)
-    nx=f.createDimension('nx',len(self.grid_x)-1)    
-    
+    nx=f.createDimension('nx',len(self.grid_x)-1)
+
     yv=f.createVariable('y','f8',('nyp','nxp'))
-    xv=f.createVariable('x','f8',('nyp','nxp'))    
+    xv=f.createVariable('x','f8',('nyp','nxp'))
     yv.units=self.dict['axis_units']
-    xv.units=self.dict['axis_units']    
+    xv.units=self.dict['axis_units']
     yv[:]=self.y
     xv[:]=self.x
 
@@ -687,13 +805,14 @@ class supergrid(object):
       areav[:]=self.area
       anglev=f.createVariable('angle_dx','f8',('nyp','nxp'))
       anglev.units='degrees'
-      anglev[:]=self.angle_dx            
+      anglev[:]=self.angle_dx
 
     f.sync()
     f.close()
       
 
-        
+
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
