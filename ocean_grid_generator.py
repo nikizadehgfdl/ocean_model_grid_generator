@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 import numpy as np
+import sys, getopt
 
 #Constants
 PI_180 = np.pi/180.
@@ -8,6 +9,7 @@ Re = 6.378e6
 
 
 def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_p,lon_p,lenlon):
+    print( 'Generating bipolar grid bounded at latitude ',lat0_p  )
     rp=np.tan(0.5*(90-lat0_p)*PI_180)
     #First define a (lon,lat) coordinate on the Northern hemisphere of the globe sphere
     #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian 
@@ -110,6 +112,7 @@ def bp_phi(x,y,bpsp,bpnp):
     return bp_phi
 
 def generate_bipolar_cap_grid_fms(Ni,Nj_ncap,lat0_p,lon_p,lenlon,lenlat):
+    print( 'Generating FMS bipolar grid bounded at latitude ',lat0_p  )
     rp=np.tan(0.5*(90-lat0_p)*PI_180) #Murray section 2.2 before Eq(6) r_p=tan(\phi_P\prime /2) 
                                                    #where \phi_P is the latitude of the bounding parrallel lat0
     sp_lon_cap = lon_p  + np.arange(Ni+1) * lenlon/Ni 
@@ -145,12 +148,10 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M):
     # Diagnose nearest integer y(phi range)
     y_star = y_mercator_rounded(Ni, np.array([phi_s*PI_180,phi_n*PI_180]))
     Nj=y_star[1]-y_star[0]
-    print( 'y*=',y_star, 'nj=', Nj )
-    print( 'Actual phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
+#    print( 'y*=',y_star, 'nj=', Nj )
+    print( 'Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
     phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
-    print( 'Grid =', phi_M )
-#    if(y_star[1]-y_star[0] != Nj):
-#        print("Error: the Mercator construct did not produce the expected number of j points ",Nj)
+#    print( 'Grid =', phi_M )
     y_grid_M = np.tile(phi_M.reshape(Nj+1,1),(1,Ni+1))
     lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/Ni
     x_grid_M = np.tile(lam_M,(Nj+1,1)) 
@@ -158,6 +159,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M):
 
                                 
 def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut):
+    print( 'Generating displaced pole grid bounded at latitude ',lat0_SO  )
     x=lon0 + np.arange(Ni+1) * lenlon/Ni
     y=np.linspace(-90.,0.5*(lat0_SO-90.0),Nj_scap//8)
     y=np.concatenate((y,np.linspace(y.max(),lat0_SO,7*Nj_scap//8+1)))
@@ -220,7 +222,7 @@ def cut_above(lam,phi,upperlat):
     return lam[0:jmax,:], phi[0:jmax,:]
 
 #utility function to plot grids
-def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True):
+def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None):
     if (phi.shape != lam.shape): raise Exception('Ooops: lam and phi should have same shape')
     nj,ni = lam.shape
     if(newfig):
@@ -229,9 +231,11 @@ def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig
         plt.plot(lam[:,i],phi[:,i],lam_color)
     for j in range(0,nj,stride):
         plt.plot(lam[j,:],phi[j,:],phi_color)
+    if title is not None:
+        plt.title(title)
 #plot_mesh_in_latlon(lams,phis,stride=16)
 
-def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True):
+def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None):
     if lowerlat is not None:
         lam,phi = cut_below(lam,phi,lowerlat=lowerlat)
         
@@ -242,7 +246,7 @@ def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=
     y = np.cos(phi*PI_180) * np.sin(lam*PI_180)
     z = np.sin(phi*PI_180)
         
-    plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig)
+    plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title)
 #plt.figure(figsize=(6,6))
 #plot_mesh_in_xyz(lams, phis, stride=20)
 
@@ -329,3 +333,64 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat):
 
 
 
+def main(argv):
+    # Specify the grid properties
+    # All
+    # Specify the desired resolution
+    degree_resolution_inverse = 4 #quarter degree grid
+    refine=2    # Set to 2 for supergrid
+    lenlon=360  # global longitude range
+    lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
+    Ni = lenlon*refine*degree_resolution_inverse
+
+    #Mercator grid
+    phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
+    lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon)    
+    #Northern bipolar cap
+    Nj_ncap=119*refine
+    lon_bp=lon0 # longitude of the displaced pole(s)
+    lat0_bp=phi_n_Merc 
+    lenlat_bp=90.0-lat0_bp
+    lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
+    #Southern grid
+    Nj_SO=110*refine
+    lat0_SO=-78.0
+    lenlat_SO = phi_s_Merc-lat0_SO 
+    lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
+    #Southern cap
+    Nj_scap=80*refine
+    lon_dp=100.0   # longitude of the displaced pole 
+    r_dp=0.20
+    doughnut=0.12
+    lamc_DP,phic_DP = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut)
+
+    #Concatenate to generate the whole grid
+    #Start from displaced southern cap and join the southern ocean grid
+    print("Stitching the grids together...")
+    lam1=np.concatenate((lamc_DP,lamSO),axis=0)
+    phi1=np.concatenate((phic_DP,phiSO),axis=0)
+    #Join the Mercator grid
+    lam2=np.concatenate((lam1,lamMerc),axis=0)
+    phi2=np.concatenate((phi1,phiMerc),axis=0)
+    #Join the norhern bipolar cap grid
+    lam3=np.concatenate((lam2,lamBP),axis=0)
+    phi3=np.concatenate((phi2,phiBP),axis=0)
+
+    #Generate the metrics for the whole grid and write the grid file
+    dx3,dy3,area3,angle3 = generate_grid_metrics(lam3,phi3,axis_units='degrees')
+    #write the grid file
+    write_nc(lam3,phi3,dx3,dy3,area3,angle3,axis_units='degrees',fnam='tripolar_0.25_script.nc')
+    print("Wrote the whole grid to file tripolar_0.25_script.nc")
+    
+
+    #Visualization
+    plot_mesh_in_xyz(lam2,phi2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
+   
+    plot_mesh_in_xyz(lam3,phi3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
+    plt.show()
+
+    
+
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
