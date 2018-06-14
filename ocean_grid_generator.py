@@ -8,23 +8,22 @@ PI_180 = np.pi/180.
 Re = 6.378e6
 
 
-def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_p,lon_p,lenlon):
-    print( 'Generating bipolar grid bounded at latitude ',lat0_p  )
-    rp=np.tan(0.5*(90-lat0_p)*PI_180)
+def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
+    print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
+    rp=np.tan(0.5*(90-lat0_bp)*PI_180)
     #First define a (lon,lat) coordinate on the Northern hemisphere of the globe sphere
     #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian 
-    sp_long = lon_p + np.arange(Ni+1) * lenlon/Ni 
-    lamg = np.tile(sp_long,(Nj_ncap+1,1))
- 
-    sp_latg_prime = np.zeros(Nj_ncap+1)
-    for j in range(1,Nj_ncap+1):
-        phiprimehalf=PI_180*(90-sp_latg_prime[j-1])/2
-        sp_latg_prime[j] = sp_latg_prime[j-1] + ((90-lat0_p)/Nj_ncap) *(np.cos(phiprimehalf))**2 *(1+(rp*np.tan(phiprimehalf))**2)/rp
-    phig = np.tile(sp_latg_prime.reshape((Nj_ncap+1,1)),(1,Ni+1))
+    lon_g = lon_bp  + np.arange(Ni+1) * lenlon/Ni 
+    lamg = np.tile(lon_g,(Nj_ncap+1,1)) 
+    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/Nj_ncap
+    phig0_cap = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
+    ### symmetry meridian resolution fix 
+    rp=np.tan(0.5*(90-lat0_bp)*PI_180)
+    phig = 90-2*np.arctan(np.tan(0.5*(90-phig0_cap)*PI_180)/rp)/PI_180
 
     #Simplify  the formulas to avoid division by zero
     #alpha  = np.cos((lamg-lon_p)*PI_180) 
-    alpha2 = (np.cos((lamg-lon_p)*PI_180))**2
+    alpha2 = (np.cos((lamg-lon_bp)*PI_180))**2
     #beta = -np.cotan(phig*PI_180)
     beta2_inv = (np.tan(phig*PI_180))**2
     
@@ -32,71 +31,29 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_p,lon_p,lenlon):
     
     B=np.sqrt((1-alpha2)/(1+alpha2*beta2_inv)) #Actually two equations  +- |B|
 
-    phic = np.arcsin(A)/PI_180
     lamc = np.arcsin(B)/PI_180 
+    #phic = np.arcsin(A)/PI_180
+    #or use
+    chic = np.arccos(A)
 
     ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
     ##We have to pickup the "correct" root. 
     ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
     ##I am sure there is a more mathematically concrete way to do this.
-    lamc = np.where((lamg-lon_p>90)&(lamg-lon_p<=180),180-lamc,lamc)
-    lamc = np.where((lamg-lon_p>180)&(lamg-lon_p<=270),180+lamc,lamc)
-    lamc = np.where((lamg-lon_p>270),360-lamc,lamc)
-    lams = lamc + lon_p
+    lamc = np.where((lamg-lon_bp>90)&(lamg-lon_bp<=180),180-lamc,lamc)
+    lamc = np.where((lamg-lon_bp>180)&(lamg-lon_bp<=270),180+lamc,lamc)
+    lamc = np.where((lamg-lon_bp>270),360-lamc,lamc)
+    lams = lamc + lon_bp
 
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
     ##then we have tan(\phi_s'/2)=tan(\phi_p'/2)tan(\phi_c'/2)
 
     #phis = 90 - 2 * np.arctan(rp * np.tan(0.5*(90-phic)*PI_180))/PI_180
-    #or
-    chic = np.arccos(A)
+    #or equivalently
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
     return lams,phis
 
-def bipolar_cap_grid_0(Ni,Nj_ncap,lat0_p,lon_p,lenlon):
-    #First define a regular (lon,lat) coordinate on the Northern hemisphere of the globe sphere
-    sp_long = lon_p + np.arange(Ni+1) * lenlon/Ni 
-    sp_latg = 0 + np.arange(Nj_ncap+1) * 90/Nj_ncap
-    long = np.tile(sp_long,(Nj_ncap+1,1)) 
-    latg = np.tile(sp_latg.reshape((Nj_ncap+1,1)),(1,Ni+1))
-    #Transform the (lon,lat) grid to a bipolar grid at the desired latutude
-    lams,phis = bipolar_cap_0(lamg=long,phig=latg,lat0_p=lat0_p,lon_p=lon_p)
-    #
-    return lams,phis
 
-def bipolar_cap_0(lamg,phig,lat0_p,lon_p):
-    rp=np.tan(0.5*(90-lat0_p)*PI_180)
-
-    #Simplify  the formulas to avoid division by zero
-    #alpha  = np.cos((lamg-lon_p)*PI_180) 
-    alpha2 = (np.cos((lamg-lon_p)*PI_180))**2
-    #beta = -np.cotan(phig*PI_180)
-    beta2_inv = (np.tan(phig*PI_180))**2
-    
-    A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|
-    
-    B=np.sqrt((1-alpha2)/(1+alpha2*beta2_inv)) #Actually two equations  +- |B|
-
-    phic = np.arcsin(A)/PI_180
-    lamc = np.arcsin(B)/PI_180 
-
-    ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
-    ##We have to pickup the "correct" root. 
-    ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
-    ##I am sure there is a more mathematically concrete way to do this.
-    lamc = np.where((lamg-lon_p>90)&(lamg-lon_p<=180),180-lamc,lamc)
-    lamc = np.where((lamg-lon_p>180)&(lamg-lon_p<=270),180+lamc,lamc)
-    lamc = np.where((lamg-lon_p>270),360-lamc,lamc)
-    lams = lamc + lon_p
-
-    ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
-    ##then we have tan(\phi_s'/2)=tan(\phi_p'/2)tan(\phi_c'/2)
-
-    #phis = 90 - 2 * np.arctan(rp * np.tan(0.5*(90-phic)*PI_180))/PI_180
-    #or
-    chic = np.arccos(A)
-    phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
-    return lams,phis
 
 def bp_lam(x,y,bpeq,rp):
     """bp_lam = ((90-y)/(90-lat_join))*90
