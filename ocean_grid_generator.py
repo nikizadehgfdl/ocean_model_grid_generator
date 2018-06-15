@@ -7,7 +7,6 @@ import sys, getopt
 PI_180 = np.pi/180.
 Re = 6.378e6
 
-
 def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
     rp=np.tan(0.5*(90-lat0_bp)*PI_180)
@@ -27,9 +26,17 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     #beta = -np.cotan(phig*PI_180)
     beta2_inv = (np.tan(phig*PI_180))**2
     
-    A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|
-    
+    A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|    
     B=np.sqrt((1-alpha2)/(1+alpha2*beta2_inv)) #Actually two equations  +- |B|
+#   Equivalently we can do the following which has manifest symmetry lam --> 180+lam
+#    A=np.sin((lamg-lon_bp)*PI_180)*np.sin(phig*PI_180) #Actually two equations  +- |A|
+#    A=np.where((lamg-lon_bp)>180,-A,A)
+#    
+#    B=np.sin((lamg-lon_bp)*PI_180)/np.sqrt(1+alpha2*beta2_inv) #Actually two equations  +- |B|
+#    B=np.where((lamg-lon_bp)>180,-B,B)
+
+    #Deal with beta=0
+    B=np.where(np.abs(beta2_inv)>1.0E10 , 0.0, B)
 
     lamc = np.arcsin(B)/PI_180 
     #phic = np.arcsin(A)/PI_180
@@ -43,6 +50,9 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     lamc = np.where((lamg-lon_bp>90)&(lamg-lon_bp<=180),180-lamc,lamc)
     lamc = np.where((lamg-lon_bp>180)&(lamg-lon_bp<=270),180+lamc,lamc)
     lamc = np.where((lamg-lon_bp>270),360-lamc,lamc)
+    #Along symmetry meridian choose lamc
+    lamc = np.where((lamg-lon_bp==90),90,lamc)    #Along symmetry meridian choose lamc=90-lon_bp
+    lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp    
     lams = lamc + lon_bp
 
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
@@ -52,8 +62,6 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     #or equivalently
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
     return lams,phis
-
-
 
 def bp_lam(x,y,bpeq,rp):
     """bp_lam = ((90-y)/(90-lat_join))*90
