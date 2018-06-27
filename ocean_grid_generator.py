@@ -5,7 +5,7 @@ import sys, getopt
 
 #Constants
 PI_180 = np.pi/180.
-Re = 6.378e6
+_default_Re = 6.378e6
 
 def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
@@ -17,7 +17,6 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/Nj_ncap
     phig0_cap = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
     ### symmetry meridian resolution fix 
-    rp=np.tan(0.5*(90-lat0_bp)*PI_180)
     phig = 90-2*np.arctan(np.tan(0.5*(90-phig0_cap)*PI_180)/rp)/PI_180
 
     #Simplify  the formulas to avoid division by zero
@@ -61,6 +60,7 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     #phis = 90 - 2 * np.arctan(rp * np.tan(0.5*(90-phic)*PI_180))/PI_180
     #or equivalently
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
+    print('   number of js=',phis.shape[0])
     return lams,phis
 
 def bp_lam(x,y,bpeq,rp):
@@ -93,6 +93,7 @@ def generate_bipolar_cap_grid_fms(Ni,Nj_ncap,lat0_p,lon_p,lenlon,lenlat):
 
     chic_fms = np.arccos(np.cos(lamc_fms*PI_180)*np.cos(phic_fms*PI_180)) #eqn.6
     phis_fms = 90 - 2 * np.arctan(rp*np.tan(chic_fms/2))/PI_180
+    print('   number of js=',phis_fms.shape[0])
     return lams_fms, phis_fms
 
 
@@ -120,6 +121,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M):
     y_grid_M = np.tile(phi_M.reshape(Nj+1,1),(1,Ni+1))
     lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/Ni
     x_grid_M = np.tile(lam_M,(Nj+1,1)) 
+    print('   number of js=',y_grid_M.shape[0])
     return x_grid_M,y_grid_M
 
                                 
@@ -130,7 +132,8 @@ def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doug
     y=np.concatenate((y,np.linspace(y.max(),lat0_SO,7*Nj_scap//8+1)))
     X1,Y1=np.meshgrid(x,y)
     lamc_DP,phic_DP = displaced_pole_cap(X1,Y1,lam_pole=-lon_dp,r_pole=r_dp,lat_joint=lat0_SO,
-                                         excluded_fraction=doughnut)   
+                                         excluded_fraction=doughnut) 
+    print('   number of js=',phic_DP.shape[0])
     return lamc_DP,phic_DP
 
 
@@ -155,8 +158,13 @@ def displaced_pole_cap(lon_grid,lat_grid,lam_pole,r_pole,lat_joint,excluded_frac
     lamcDP = np.angle(w, deg=True)
     #np.angle returns a value in the interval (-180,180)
     #However the input grid longitude is in (-lon0,-lon0+360), e.g., (-300,60)
-    #We should shift the angle to be in that interval
-    lamcDP = np.where(lamcDP>lon_grid[0,-1],lamcDP-360,lamcDP)
+    #We should shift the angle to be in that interval (note lon_grid[0,-1] = 60)
+    #lamcDP = np.where(lamcDP>lon_grid[0,-1],lamcDP-360,lamcDP)
+    #This will fix the discontinuity at lon_grid<0 but makes lamcDP discontinous at the end of the interval near 60
+    #This is because there are a number of points with lamcDP>60 just below lon_grid=60
+    #We need a second condition to leave these points intact, one that works is:
+    lamcDP = np.where((lamcDP>lon_grid[0,-1])&(lon_grid<0) ,lamcDP-360,lamcDP)
+    #Niki: The second condition above is ad hoc. Work on a more elaborate condition to get rid of the  discontinuity at lon_grid>60
     rw=np.absolute(w)
     phicDP = -90+np.arctan(rw*r_joint)/PI_180
     if excluded_fraction is not None:
@@ -222,7 +230,7 @@ def mdist(x1,x2):
   d=np.minimum(a,b)
   return d
 
-def generate_grid_metrics(x,y,axis_units='degrees'):
+def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re):
     nytot,nxtot = x.shape
     if  axis_units == 'm':
       metric=1.0
@@ -255,39 +263,46 @@ def generate_grid_metrics(x,y,axis_units='degrees'):
     return dx,dy,area,angle_dx
 
 
-def write_nc(x,y,dx,dy,area,angle,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC'):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC'):
     import netCDF4 as nc
 
     if fnam is None:
       fnam='supergrid.nc'
-    f=nc.Dataset(fnam,'w',format=format)
-    dims=[]
-    vars=[]
-    nytot,nxtot = y.shape
-    nyp=f.createDimension('nyp',nytot)
-    nxp=f.createDimension('nxp',nxtot)
-    ny=f.createDimension('ny',nytot-1)
-    nx=f.createDimension('nx',nxtot-1)    
-    yv=f.createVariable('y','f8',('nyp','nxp'))
-    xv=f.createVariable('x','f8',('nyp','nxp'))    
-    yv.units=axis_units
-    xv.units=axis_units 
+    fout=nc.Dataset(fnam,'w',format=format)
+
+    ny=area.shape[0]; nx = area.shape[1]
+    nyp=ny+1; nxp=nx+1
+    print ('ny,nx= ',ny,nx)
+
+    nyp=fout.createDimension('nyp',nyp)
+    nxp=fout.createDimension('nxp',nxp)
+    ny=fout.createDimension('ny',ny)
+    nx=fout.createDimension('nx',nx)
+    string=fout.createDimension('string',255)    
+    tile=fout.createVariable('tile','S1',('string'))
+    yv=fout.createVariable('y','f8',('nyp','nxp'))
+    xv=fout.createVariable('x','f8',('nyp','nxp'))    
+    yv.units='degrees'
+    xv.units='degrees'
     yv[:]=y
     xv[:]=x
-    dyv=f.createVariable('dy','f8',('ny','nxp'))
+    tile[0:4]='tile1'
+    dyv=fout.createVariable('dy','f8',('ny','nxp'))
     dyv.units='meters'
     dyv[:]=dy
-    dxv=f.createVariable('dx','f8',('nyp','nx'))
+    dxv=fout.createVariable('dx','f8',('nyp','nx'))
     dxv.units='meters'
     dxv[:]=dx
-    areav=f.createVariable('area','f8',('ny','nx'))
+    areav=fout.createVariable('area','f8',('ny','nx'))
     areav.units='m2'
     areav[:]=area
-    anglev=f.createVariable('angle_dx','f8',('nyp','nxp'))
+    anglev=fout.createVariable('angle_dx','f8',('nyp','nxp'))
     anglev.units='degrees'
-    anglev[:]=angle            
-    f.sync()
-    f.close()
+    anglev[:]=angle_dx            
+
+    fout.sync()
+    fout.close()
+
 
 def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat):
     llonSP = llon0 + np.arange(lni+1) * llen_lon/lni
@@ -303,55 +318,97 @@ def main(argv):
     # All
     # Specify the desired resolution
     degree_resolution_inverse = 4 #quarter degree grid
-    refine=2    # Set to 2 for supergrid
+    refine=2*degree_resolution_inverse   # 2 for supergrid
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
-    Ni = lenlon*refine*degree_resolution_inverse
+    Ni     =refine* lenlon
+    Nj_ncap=refine* 60      #MIDAS has refine*( 240 for 1/4 degree, 119 for 1/2 degree
+    Nj_SO  =refine* 28      #MIDAS has refine*( 110 for 1/4 degree,  54 for 1/2 degree
+    Nj_scap=refine* 20      #MIDAS has refine*(  80 for 1/4 degree, ??? for 1/2 degree
+    #Nj_Merc=UNUSED         #MIDAS has refine*(                     364 for 1/2 degree
+    #Niki: Where do these factors come from?
 
     #Mercator grid
+    #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
+    #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
+    #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
     lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon)    
+    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees')
+
     #Northern bipolar cap
-    Nj_ncap=119*refine
     lon_bp=lon0 # longitude of the displaced pole(s)
     lat0_bp=phi_n_Merc 
     lenlat_bp=90.0-lat0_bp
     lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
-    #Southern grid
-    Nj_SO=110*refine
+    dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP,axis_units='degrees')
+
+    #Southern Ocean grid
     lat0_SO=-78.0
     lenlat_SO = phi_s_Merc-lat0_SO 
+    print( 'Generating Southern Ocean grid bounded by latitudes ',phi_s_Merc,lat0_SO  )
     lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
+    print('   number of js=',phiSO.shape[0])
+    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees')
+
     #Southern cap
-    Nj_scap=80*refine
     lon_dp=100.0   # longitude of the displaced pole 
     r_dp=0.20
-    doughnut=0.12
-    lamc_DP,phic_DP = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut)
+    if(r_dp == 0.0):
+        print( 'Generating the southern cap grid bounded at latitude ', lat0_SO )
+        lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO)
+    else:
+        print( 'Generating the displaced pole southern cap grid bounded at latitude', lat0_SO  )
+        doughnut=0.12
+        lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut)
+
+    dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC,axis_units='degrees')
+    print('   number of js=',phiSC.shape[0])
 
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
     print("Stitching the grids together...")
-    lam1=np.concatenate((lamc_DP,lamSO),axis=0)
-    phi1=np.concatenate((phic_DP,phiSO),axis=0)
+    x1=np.concatenate((lamSC,lamSO[1:,:]),axis=0)
+    y1=np.concatenate((phiSC,phiSO[1:,:]),axis=0)
+    dx1=np.concatenate((dxSC,dxSO[1:,:]),axis=0)
+    dy1=np.concatenate((dySC,dySO),axis=0)
+    area1=np.concatenate((areaSC,areaSO),axis=0)
+    angle1=np.concatenate((angleSC[:-1,:],angleSO[:-1,:]),axis=0)
     #Join the Mercator grid
-    lam2=np.concatenate((lam1,lamMerc),axis=0)
-    phi2=np.concatenate((phi1,phiMerc),axis=0)
+    x2=np.concatenate((x1,lamMerc[1:,:]),axis=0)
+    y2=np.concatenate((y1,phiMerc[1:,:]),axis=0)
+    dx2=np.concatenate((dx1,dxMerc[1:,:]),axis=0)
+    dy2=np.concatenate((dy1,dyMerc),axis=0)
+    area2=np.concatenate((area1,areaMerc),axis=0)
+    angle2=np.concatenate((angle1,angleMerc[:-1,:]),axis=0)
     #Join the norhern bipolar cap grid
-    lam3=np.concatenate((lam2,lamBP),axis=0)
-    phi3=np.concatenate((phi2,phiBP),axis=0)
+    x3=np.concatenate((x2,lamBP[1:,:]),axis=0)
+    y3=np.concatenate((y2,phiBP[1:,:]),axis=0)
+    dx3=np.concatenate((dx2,dxBP[1:,:]),axis=0)
+    dy3=np.concatenate((dy2,dyBP),axis=0)
+    area3=np.concatenate((area2,areaBP),axis=0)
+    angle3=np.concatenate((angle2,angleBP),axis=0)
 
-    #Generate the metrics for the whole grid and write the grid file
-    dx3,dy3,area3,angle3 = generate_grid_metrics(lam3,phi3,axis_units='degrees')
+    ##Drop the first 80 points from the southern cap! Make this an option!
+    trim_south = True
+    if(trim_south):
+        x3 = x3[80:,:]
+        y3 = y3[80:,:]
+        dx3 = dx3[80:,:]
+        dy3 = dy3[80:,:]
+        area3 = area3[80:,:]
+        angle3 = angle3[80:,:]
+
     #write the grid file
-    write_nc(lam3,phi3,dx3,dy3,area3,angle3,axis_units='degrees',fnam='tripolar_0.25_script.nc')
-    print("Wrote the whole grid to file tripolar_0.25_script.nc")
+    fname = 'tripolar_dispsp_res'+str(degree_resolution_inverse)+'.nc'
+    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=fname)
+    print("Wrote the whole grid to file ",fname)
     
 
     #Visualization
-    plot_mesh_in_xyz(lam2,phi2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
+    plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
    
-    plot_mesh_in_xyz(lam3,phi3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
+    plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
     plt.show()
 
     
