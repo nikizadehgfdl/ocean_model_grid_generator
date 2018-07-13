@@ -6,7 +6,6 @@ python:
 install:
   - pip install --upgrade pip
   - pip install netcdf4 numpy 
-  - pip install sys getopt datetime os subprocess
   - pip freeze
 
 script:
