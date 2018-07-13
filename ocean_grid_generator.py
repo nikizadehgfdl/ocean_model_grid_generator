@@ -471,7 +471,7 @@ def main(argv):
         angle3 = angle3[80:,:]
 
     #write the grid file    
-    hist = "This grid file was generated on "+ str(datetime.date.today()) + " by "+os.getlogin()+" via command " + ' '.join(sys.argv)
+    hist = "This grid file was generated on "+ str(datetime.date.today()) + " via command " + ' '.join(sys.argv)
     desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phi_s_Merc) + " to " + str(lat0_SO)+" degrees and capped by a "
     if(r_dp != 0.0): 
         desc = desc + "displaced pole "
