@@ -2,10 +2,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 import numpy as np
 import sys, getopt
+import datetime, os, subprocess
 
 #Constants
 PI_180 = np.pi/180.
-_default_Re = 6.378e6
+#_default_Re = 6.378e6
+_default_Re = 6371.e3 #MIDAS
+#_default_Re = 6.371e6
 
 def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
@@ -114,10 +117,26 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M):
     # Diagnose nearest integer y(phi range)
     y_star = y_mercator_rounded(Ni, np.array([phi_s*PI_180,phi_n*PI_180]))
     Nj=y_star[1]-y_star[0]
+    #Ensure that the equator (y=0) is a u-point
+    if(y_star[0]%2 == 0):
+        print("Equator is not going to be a u-point, fix this by shifting the bounds")
+        y_star[0] = y_star[0] - 1
+        y_star[1] = y_star[1] - 1
 #    print( 'y*=',y_star, 'nj=', Nj )
     print( 'Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
     phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
 #    print( 'Grid =', phi_M )
+    #Ensure that the equator (y=0) is included and is a u-point
+    equator=0.0
+    equator_index = np.searchsorted(phi_M,equator)
+    if(equator_index == 0): 
+        raise Exception('Ooops: Equator is not in the grid')
+    else:
+        print("Equator is at j=", equator_index)
+    #Ensure that the equator (y=0) is a u-point
+    if(equator_index%2 == 0):
+        raise Exception("Ooops: Equator is not going to be a u-point")
+
     y_grid_M = np.tile(phi_M.reshape(Nj+1,1),(1,Ni+1))
     lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/Ni
     x_grid_M = np.tile(lam_M,(Nj+1,1)) 
@@ -165,6 +184,9 @@ def displaced_pole_cap(lon_grid,lat_grid,lam_pole,r_pole,lat_joint,excluded_frac
     #We need a second condition to leave these points intact, one that works is:
     lamcDP = np.where((lamcDP>lon_grid[0,-1])&(lon_grid<0) ,lamcDP-360,lamcDP)
     #Niki: The second condition above is ad hoc. Work on a more elaborate condition to get rid of the  discontinuity at lon_grid>60
+    #Another adhoc fix for single point correction
+    lamcDP[-1,0] = lamcDP[-1,0]-360
+
     rw=np.absolute(w)
     phicDP = -90+np.arctan(rw*r_joint)/PI_180
     if excluded_fraction is not None:
@@ -230,7 +252,7 @@ def mdist(x1,x2):
   d=np.minimum(a,b)
   return d
 
-def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re):
+def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafix=False):
     nytot,nxtot = x.shape
     if  axis_units == 'm':
       metric=1.0
@@ -250,7 +272,11 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re):
     dy = np.sqrt(dy)
     dx=dx[:,:-1]
     dy=dy[:-1,:]
-    area=dx[:-1,:]*dy[:,:-1]    
+    if(latlon_areafix):
+        delsin_j = np.roll(np.sin(y*PI_180),shift=-1,axis=0) - np.sin(y*PI_180)
+        area=metric*metric*dx_i[:-1,:-1]*delsin_j[:-1,:-1]/PI_180
+    else:
+        area=dx[:-1,:]*dy[:,:-1]    
     angle_dx=np.zeros((nytot,nxtot))
 #    angle_dx = np.arctan2(dy_i,dx_i)/PI_180      
 #    self.angle_dx = numpy.arctan2(dy_i,dx_i)*180.0/numpy.pi
@@ -263,7 +289,7 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re):
     return dx,dy,area,angle_dx
 
 
-def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC'):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC',description=None,history=None,source=None):
     import netCDF4 as nc
 
     if fnam is None:
@@ -286,7 +312,12 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     xv.units='degrees'
     yv[:]=y
     xv[:]=x
-    tile[0:4]='tile1'
+#    tile[0:4]='tile1'
+    tile[0]='t'
+    tile[1]='i'
+    tile[2]='l'
+    tile[3]='e'
+    tile[4]='1'
     dyv=fout.createVariable('dy','f8',('ny','nxp'))
     dyv.units='meters'
     dyv[:]=dy
@@ -298,7 +329,11 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     areav[:]=area
     anglev=fout.createVariable('angle_dx','f8',('nyp','nxp'))
     anglev.units='degrees'
-    anglev[:]=angle_dx            
+    anglev[:]=angle_dx
+    #global attributes
+    fout.history = history
+    fout.description = description
+    fout.source =  source
 
     fout.sync()
     fout.close()
@@ -314,18 +349,51 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat):
 
 
 def main(argv):
+
+    degree_resolution_inverse = 4 # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
+    trim_south = False
+    gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
+
+    try:
+        opts, args = getopt.getopt(argv,"hf:r:",["gridfilename=","inverse_resolution=","trim_south_80"])
+    except getopt.GetoptError:
+        print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --trim_south_80')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --trim_south_80')
+            sys.exit()
+        elif opt in ("-f", "--gridfilename"):
+            gridfilename = arg
+        elif opt in ("-r", "--inverse_resolution"):
+            degree_resolution_inverse = int(arg)
+        elif opt in ("--trim_south_80"):
+            trim_south = True
+
+    scriptpath = sys.argv[0]
+#    print("scriptpath=",scriptpath)   
+    scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
+    scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
+#    print("scriptname=",scriptname)
+#    print(subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; /usr/local/x64/git-2.4.6/bin/git status --porcelain `basename "+sys.argv[0]+"` ; exit 0",stderr=subprocess.STDOUT,shell=True))
+#    scriptgithash = subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; /usr/local/x64/git-2.4.6/bin/git status --porcelain `basename "+sys.argv[0]+"` ; exit 0",stderr=subprocess.STDOUT,shell=True)
+    scriptgithash = subprocess.check_output("cd "+scriptdirname +";/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+    scriptgitMod  = subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+    if("M" in str(scriptgitMod)):
+        scriptgitMod = " , But was localy Modified!"
+    
     # Specify the grid properties
     # All
     # Specify the desired resolution
-    degree_resolution_inverse = 4 #quarter degree grid
-    refine=2*degree_resolution_inverse   # 2 for supergrid
+    refineS=2 # factor 2 is for supergrid
+    refineR=degree_resolution_inverse   
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
-    Ni     =refine* lenlon
-    Nj_ncap=refine* 60      #MIDAS has refine*( 240 for 1/4 degree, 119 for 1/2 degree
-    Nj_SO  =refine* 28      #MIDAS has refine*( 110 for 1/4 degree,  54 for 1/2 degree
-    Nj_scap=refine* 20      #MIDAS has refine*(  80 for 1/4 degree, ??? for 1/2 degree
-    #Nj_Merc=UNUSED         #MIDAS has refine*(                     364 for 1/2 degree
+    Ni     =refineR*refineS* lenlon
+    Nj_ncap=refineR* 120   #MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree
+    Nj_SO  =refineR*  55   #MIDAS has refineS*( 110 for 1/4 degree,  54 for 1/2 degree
+    Nj_scap=refineR*  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+    #Nj_Merc=UNUSED        #MIDAS has refineS*( 700 for 1/4 degree, 364 for 1/2 degree
     #Niki: Where do these factors come from?
 
     #Mercator grid
@@ -334,7 +402,7 @@ def main(argv):
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
     lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon)    
-    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees')
+    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees',latlon_areafix=False)
 
     #Northern bipolar cap
     lon_bp=lon0 # longitude of the displaced pole(s)
@@ -349,7 +417,7 @@ def main(argv):
     print( 'Generating Southern Ocean grid bounded by latitudes ',phi_s_Merc,lat0_SO  )
     lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
     print('   number of js=',phiSO.shape[0])
-    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees')
+    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees',latlon_areafix=False)
 
     #Southern cap
     lon_dp=100.0   # longitude of the displaced pole 
@@ -390,7 +458,6 @@ def main(argv):
     angle3=np.concatenate((angle2,angleBP),axis=0)
 
     ##Drop the first 80 points from the southern cap! Make this an option!
-    trim_south = True
     if(trim_south):
         x3 = x3[80:,:]
         y3 = y3[80:,:]
@@ -399,10 +466,23 @@ def main(argv):
         area3 = area3[80:,:]
         angle3 = angle3[80:,:]
 
-    #write the grid file
-    fname = 'tripolar_dispsp_res'+str(degree_resolution_inverse)+'.nc'
-    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=fname)
-    print("Wrote the whole grid to file ",fname)
+    #write the grid file    
+    hist = "This grid file was generated on "+ str(datetime.date.today()) + " by "+os.getlogin()+" via command " + ' '.join(sys.argv)
+    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(lat0_SO) + " to " + str(phi_n_Merc)+" degrees and capped by a "
+    if(r_dp != 0.0): 
+        desc = desc + "displaced pole "
+    else:
+        desc = desc + "regular "
+    desc = desc + "grid south of "+ str(lat0_SO) +" degrees."
+    source =  scriptpath + " had git hash " + scriptgithash + scriptgitMod 
+    source =  source + " To obtain the code: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
+
+#    print(hist)
+#    print(desc)
+#    print(source)
+
+    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source)
+    print("Wrote the whole grid to file ",gridfilename)
     
 
     #Visualization
