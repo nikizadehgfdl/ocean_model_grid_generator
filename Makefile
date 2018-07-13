@@ -6,7 +6,7 @@ all: $(TARGS) hash.md5
 	md5sum -c hash.md5
        
 tripolar_res2.nc: 
-	./ocean_grid_generator.py -f tripolar_res2.nc -r 2 --dp 0
+	./ocean_grid_generator.py -f tripolar_res2.nc -r 2 --rdp 0
 tripolar_disp_res4.nc:
 	./ocean_grid_generator.py -f tripolar_disp_res4.nc -r 4 --trim_south_80
 tripolar_disp_res8.nc:
