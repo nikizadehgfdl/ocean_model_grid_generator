@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 import numpy as np
@@ -353,11 +355,12 @@ def main(argv):
     degree_resolution_inverse = 4 # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
     trim_south = False
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
-
+    r_dp=0.20
+    rdp=1
     try:
-        opts, args = getopt.getopt(argv,"hf:r:",["gridfilename=","inverse_resolution=","trim_south_80"])
+        opts, args = getopt.getopt(argv,"hf:r:",["gridfilename=","inverse_resolution=","rdp","trim_south_80"])
     except getopt.GetoptError:
-        print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --trim_south_80')
+        print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --rdp <displacement_factor/0.2> --trim_south_80')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
@@ -367,6 +370,8 @@ def main(argv):
             gridfilename = arg
         elif opt in ("-r", "--inverse_resolution"):
             degree_resolution_inverse = int(arg)
+        elif opt in ("--rdp"):
+             r_dp = int(rdp)*r_dp
         elif opt in ("--trim_south_80"):
             trim_south = True
 
@@ -421,7 +426,6 @@ def main(argv):
 
     #Southern cap
     lon_dp=100.0   # longitude of the displaced pole 
-    r_dp=0.20
     if(r_dp == 0.0):
         print( 'Generating the southern cap grid bounded at latitude ', lat0_SO )
         lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO)
@@ -486,10 +490,9 @@ def main(argv):
     
 
     #Visualization
-    plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
-   
-    plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
-    plt.show()
+#    plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
+#    plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
+#    plt.show()
 
     
 
