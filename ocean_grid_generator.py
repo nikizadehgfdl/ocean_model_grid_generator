@@ -300,7 +300,7 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
 
     ny=area.shape[0]; nx = area.shape[1]
     nyp=ny+1; nxp=nx+1
-    print ('ny,nx= ',ny,nx)
+    print ('Writing netcdf file with ny,nx= ',ny,nx)
 
     nyp=fout.createDimension('nyp',nyp)
     nxp=fout.createDimension('nxp',nxp)
