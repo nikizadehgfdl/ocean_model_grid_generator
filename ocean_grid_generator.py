@@ -468,14 +468,14 @@ def main(argv):
 
     #write the grid file    
     hist = "This grid file was generated on "+ str(datetime.date.today()) + " by "+os.getlogin()+" via command " + ' '.join(sys.argv)
-    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(lat0_SO) + " to " + str(phi_n_Merc)+" degrees and capped by a "
+    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phi_s_Merc) + " to " + str(lat0_SO)+" degrees and capped by a "
     if(r_dp != 0.0): 
         desc = desc + "displaced pole "
     else:
         desc = desc + "regular "
     desc = desc + "grid south of "+ str(lat0_SO) +" degrees."
     source =  scriptpath + " had git hash " + scriptgithash + scriptgitMod 
-    source =  source + " To obtain the code: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
+    source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
 
 #    print(hist)
 #    print(desc)
