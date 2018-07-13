@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import matplotlib.pyplot as plt
-import seaborn as sns; sns.set()
+#import matplotlib.pyplot as plt
+#import seaborn as sns; sns.set()
 import numpy as np
 import sys, getopt
 import datetime, os, subprocess
