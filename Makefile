@@ -1,5 +1,5 @@
 TARGS = tripolar_res2.nc \
-        tripolar_disp_res4.nc 
+        tripolar_disp_res4.nc \
 	tripolar_disp_res8.nc
 
 all: $(TARGS) hash.md5
