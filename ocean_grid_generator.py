@@ -407,7 +407,7 @@ def main(argv):
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
     lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon)    
-    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees',latlon_areafix=False)
+    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees',latlon_areafix=True)
 
     #Northern bipolar cap
     lon_bp=lon0 # longitude of the displaced pole(s)
@@ -422,7 +422,7 @@ def main(argv):
     print( 'Generating Southern Ocean grid bounded by latitudes ',phi_s_Merc,lat0_SO  )
     lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
     print('   number of js=',phiSO.shape[0])
-    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees',latlon_areafix=False)
+    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees',latlon_areafix=True)
 
     #Southern cap
     lon_dp=100.0   # longitude of the displaced pole 
