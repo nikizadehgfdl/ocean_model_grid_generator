@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-#import matplotlib.pyplot as plt
-#import seaborn as sns; sns.set()
+import matplotlib.pyplot as plt
+import seaborn as sns; sns.set()
 import numpy as np
 import sys, getopt
 import datetime, os, subprocess
@@ -115,26 +115,35 @@ def y_mercator_rounded(Ni, phi):
     y_float = y_mercator(Ni, phi)
     return ( np.sign(y_float) * np.ceil( np.abs(y_float) ) ).astype(int)
 
-def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M):
+def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_point=True, ensure_nj_even=True):
+    print( 'Requesting Mercator grid with phi range: phi_s,phi_n=', phi_s,phi_n )
     # Diagnose nearest integer y(phi range)
     y_star = y_mercator_rounded(Ni, np.array([phi_s*PI_180,phi_n*PI_180]))
-    Nj=y_star[1]-y_star[0]
+    print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1  )
     #Ensure that the equator (y=0) is a u-point
     if(y_star[0]%2 == 0):
-        print("Equator is not going to be a u-point, fix this by shifting the bounds")
-        y_star[0] = y_star[0] - 1
-        y_star[1] = y_star[1] - 1
-#    print( 'y*=',y_star, 'nj=', Nj )
-    print( 'Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
+        print("   Equator is not going to be a u-point!")
+        if(shift_equator_to_u_point):
+            print("   Fixing this by shifting the bounds!")
+            y_star[0] = y_star[0] - 1
+            y_star[1] = y_star[1] - 1
+            print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
+    if((y_star[1]-y_star[0]+1)%2 != 0):
+        print("   Supergrid has an odd number of area cells!")
+        if(ensure_nj_even):
+            print("   Fixing this by shifting the y_star[1] ")
+            y_star[1] = y_star[1] - 1
+            print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
+    Nj=y_star[1]-y_star[0]
+    print( '   Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
     phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
-#    print( 'Grid =', phi_M )
     #Ensure that the equator (y=0) is included and is a u-point
     equator=0.0
     equator_index = np.searchsorted(phi_M,equator)
     if(equator_index == 0): 
-        raise Exception('Ooops: Equator is not in the grid')
+        raise Exception('   Ooops: Equator is not in the grid')
     else:
-        print("Equator is at j=", equator_index)
+        print("   Equator is at j=", equator_index)
     #Ensure that the equator (y=0) is a u-point
     if(equator_index%2 == 0):
         raise Exception("Ooops: Equator is not going to be a u-point")
@@ -146,11 +155,15 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M):
     return x_grid_M,y_grid_M
 
                                 
-def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut):
+def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut,nparts=8, ensure_nj_even=True):
     print( 'Generating displaced pole grid bounded at latitude ',lat0_SO  )
+    print('   rdp=',r_dp,' , doughnut=',doughnut)
     x=lon0 + np.arange(Ni+1) * lenlon/Ni
-    y=np.linspace(-90.,0.5*(lat0_SO-90.0),Nj_scap//8)
-    y=np.concatenate((y,np.linspace(y.max(),lat0_SO,7*Nj_scap//8+1)))
+    y=np.linspace(-90.,0.5*(lat0_SO-90.0),Nj_scap//nparts)
+    y=np.concatenate((y,np.linspace(y.max(),lat0_SO,1+Nj_scap*(nparts-1)//nparts)))
+    if(y.shape[0]%2 != 0 and ensure_nj_even):
+        print("   The number of j's is not even. Fixing this by cutting one row at south.")
+        y = np.delete(y,0,0)
     X1,Y1=np.meshgrid(x,y)
     lamc_DP,phic_DP = displaced_pole_cap(X1,Y1,lam_pole=-lon_dp,r_pole=r_dp,lat_joint=lat0_SO,
                                          excluded_fraction=doughnut) 
@@ -341,40 +354,60 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     fout.close()
 
 
-def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat):
+def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=True):
+    print('Generating regular lat-lon grid between latitudes ', llat0, llat0+llen_lat)
     llonSP = llon0 + np.arange(lni+1) * llen_lon/lni
     llatSP = llat0 + np.arange(lnj+1) * llen_lat/lnj
-    llamSP = np.tile(llonSP,(lnj+1,1)) 
-    lphiSP = np.tile(llatSP.reshape((lnj+1,1)),(1,lni+1)) 
+    if(llatSP.shape[0]%2 != 0 and ensure_nj_even):
+        print("   The number of j's is not even. Fixing this by cutting one row at south.")
+        llatSP = np.delete(llatSP,0,0)
+    
+    llamSP = np.tile(llonSP,(llatSP.shape[0],1)) 
+    lphiSP = np.tile(llatSP.reshape((llatSP.shape[0],1)),(1,llonSP.shape[0]))
+    
+    print('   generated regular lat-lon grid between latitudes ', lphiSP[0,0],lphiSP[-1,0])
+    print('   number of js=',lphiSP.shape[0])
     return llamSP,lphiSP
 
-
+def usage():
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut>')
+ 
 
 def main(argv):
 
     degree_resolution_inverse = 4 # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
-    trim_south = False
+    south_cap = True
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
+    doughnut=0.0
     r_dp=0.20
     rdp=1
+    south_cutoff_row = 0
+    south_cutoff_ang = -90.
     try:
-        opts, args = getopt.getopt(argv,"hf:r:",["gridfilename=","inverse_resolution=","rdp","trim_south_80"])
-    except getopt.GetoptError:
-        print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --rdp <displacement_factor/0.2> --trim_south_80')
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp="])
+    except getopt.GetoptError as err:
+        print(err)
+        usage()
         sys.exit(2)
+        
     for opt, arg in opts:
         if opt == '-h':
-            print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --trim_south_80')
+            usage()
             sys.exit()
         elif opt in ("-f", "--gridfilename"):
             gridfilename = arg
         elif opt in ("-r", "--inverse_resolution"):
             degree_resolution_inverse = int(arg)
+        elif opt in ("--south_cutoff_ang"):
+            south_cutoff_ang = float(arg)
+        elif opt in ("--south_cutoff_row"):
+            south_cutoff_row = int(arg)
         elif opt in ("--rdp"):
-             r_dp = int(rdp)*r_dp
-        elif opt in ("--trim_south_80"):
-            trim_south = True
+             r_dp = int(arg)*r_dp
+        else:
+            assert False, "unhandled option"
 
+            
     scriptpath = sys.argv[0]
 #    print("scriptpath=",scriptpath)   
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
@@ -396,9 +429,6 @@ def main(argv):
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
     Ni     =refineR*refineS* lenlon
     Nj_ncap=refineR* 120   #MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree
-    Nj_SO  =refineR*  55   #MIDAS has refineS*( 110 for 1/4 degree,  54 for 1/2 degree
-    Nj_scap=refineR*  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
-    #Nj_Merc=UNUSED        #MIDAS has refineS*( 700 for 1/4 degree, 364 for 1/2 degree
     #Niki: Where do these factors come from?
 
     #Mercator grid
@@ -406,36 +436,51 @@ def main(argv):
     #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
-    lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon)    
+
+#    if(degree_resolution_inverse == 2):
+#        phi_s_Merc, phi_n_Merc = -68.05725377, 64.76080366
+#    OM4p5 grid is not Mercator around equator and cannot be reproduced by this tool
+     
+    lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon,ensure_nj_even=True)    
     dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees',latlon_areafix=True)
+    #The phi resolution in the last row of Mercator grid along the symmetry meridian
+    DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
+    DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
 
     #Northern bipolar cap
     lon_bp=lon0 # longitude of the displaced pole(s)
-    lat0_bp=phi_n_Merc 
-    lenlat_bp=90.0-lat0_bp
-    lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
+    #The phi resolution in the last row of Mercator grid along the symmetry meridian
+    lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
+    #lat0_bp=phi_n_Merc 
+    lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap-1,lat0_bp,lon_bp,lenlon)
     dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP,axis_units='degrees')
 
     #Southern Ocean grid
-    lat0_SO=-78.0
-    lenlat_SO = phi_s_Merc-lat0_SO 
-    print( 'Generating Southern Ocean grid bounded by latitudes ',phi_s_Merc,lat0_SO  )
+    lat0_SO=-78.
+    lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+    Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
     lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
-    print('   number of js=',phiSO.shape[0])
     dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees',latlon_areafix=True)
 
     #Southern cap
+    #Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+    #Here we determine Nj_scap by imposing the condition of continuity of dy across the stitch.
+    
     lon_dp=100.0   # longitude of the displaced pole 
+    deltaPhiSO = phiSO[1,Ni//4]-phiSO[0,Ni//4]
+    lat0_SC=phiSO[0,Ni//4]-deltaPhiSO
+    fullArc = lat0_SC+90.
+    halfArc = fullArc/2
+
     if(r_dp == 0.0):
-        print( 'Generating the southern cap grid bounded at latitude ', lat0_SO )
+        Nj_scap = int(fullArc/deltaPhiSO)
         lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO)
     else:
-        print( 'Generating the displaced pole southern cap grid bounded at latitude', lat0_SO  )
-        doughnut=0.12
-        lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut)
+        nparts=8
+        Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
+        lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts)
 
     dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC,axis_units='degrees')
-    print('   number of js=',phiSC.shape[0])
 
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
@@ -462,22 +507,47 @@ def main(argv):
     angle3=np.concatenate((angle2,angleBP),axis=0)
 
     ##Drop the first 80 points from the southern cap! Make this an option!
-    if(trim_south):
-        x3 = x3[80:,:]
-        y3 = y3[80:,:]
-        dx3 = dx3[80:,:]
-        dy3 = dy3[80:,:]
-        area3 = area3[80:,:]
-        angle3 = angle3[80:,:]
-
+    if(south_cutoff_row > 0):
+        jcut = south_cutoff_row - 1
+        print("cutting grid rows 0 to ", jcut)
+        x3 = x3[jcut:,:]
+        y3 = y3[jcut:,:]
+        dx3 = dx3[jcut:,:]
+        dy3 = dy3[jcut:,:]
+        area3 = area3[jcut:,:]
+        angle3 = angle3[jcut:,:]
+        
+    if(south_cutoff_ang > -90):
+        jcut = 1 + np.nonzero(y3[:,0] < south_cutoff_ang)[0][-1]
+        print("cutting grid below ",south_cutoff_ang, jcut)
+        x3 = x3[jcut:,:]
+        y3 = y3[jcut:,:]
+        dx3 = dx3[jcut:,:]
+        dy3 = dy3[jcut:,:]
+        area3 = area3[jcut:,:]
+        angle3 = angle3[jcut:,:]
+        
+        
+        
     #write the grid file    
     hist = "This grid file was generated on "+ str(datetime.date.today()) + " via command " + ' '.join(sys.argv)
-    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phi_s_Merc) + " to " + str(lat0_SO)+" degrees and capped by a "
+    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
+
+    desc = desc + "It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phi_s_Merc) + " to " + str(lat0_SO)+" degrees. "
+
+    desc = desc + "It is capped by a "
     if(r_dp != 0.0): 
         desc = desc + "displaced pole "
     else:
         desc = desc + "regular "
     desc = desc + "grid south of "+ str(lat0_SO) +" degrees."
+    
+    if(south_cutoff_ang > -90):
+        desc = desc + " It is cut south of " + str(south_cutoff_ang) + " degrees."
+
+    if(south_cutoff_row > 0):
+        desc = desc + " The first "+ str(south_cutoff_row) +" rows at south are deleted."
+    
     source =  scriptpath + " had git hash " + scriptgithash + scriptgitMod 
     source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
 
