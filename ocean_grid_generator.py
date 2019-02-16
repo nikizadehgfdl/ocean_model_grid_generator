@@ -428,7 +428,7 @@ def main(argv):
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
     Ni     =refineR*refineS* lenlon
-    Nj_ncap=refineR* 120   #MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree
+    Nj_ncap=refineR* 120 - 1  #MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree
     #Niki: Where do these factors come from?
 
     #Mercator grid
@@ -452,7 +452,7 @@ def main(argv):
     #The phi resolution in the last row of Mercator grid along the symmetry meridian
     lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
     #lat0_bp=phi_n_Merc 
-    lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap-1,lat0_bp,lon_bp,lenlon)
+    lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
     dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP,axis_units='degrees')
 
     #Southern Ocean grid
