@@ -128,7 +128,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_poi
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
             print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
-    if((y_star[1]-y_star[0]+1)%2 != 0):
+    if((y_star[1]-y_star[0]+1)%2 != 0 and ensure_nj_even):
         print("   Supergrid has an odd number of area cells!")
         if(ensure_nj_even):
             print("   Fixing this by shifting the y_star[1] ")
@@ -370,7 +370,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> --rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut>')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids]')
  
 
 def main(argv):
@@ -383,8 +383,10 @@ def main(argv):
     rdp=1
     south_cutoff_row = 0
     south_cutoff_ang = -90.
+    reproduce_MIDAS_grids = False
+    
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp="])
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -404,17 +406,15 @@ def main(argv):
             south_cutoff_row = int(arg)
         elif opt in ("--rdp"):
              r_dp = int(arg)*r_dp
+        elif opt in ("--reproduce_MIDAS_grids"):
+             reproduce_MIDAS_grids = True
         else:
             assert False, "unhandled option"
 
             
     scriptpath = sys.argv[0]
-#    print("scriptpath=",scriptpath)   
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
-#    print("scriptname=",scriptname)
-#    print(subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; /usr/local/x64/git-2.4.6/bin/git status --porcelain `basename "+sys.argv[0]+"` ; exit 0",stderr=subprocess.STDOUT,shell=True))
-#    scriptgithash = subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; /usr/local/x64/git-2.4.6/bin/git status --porcelain `basename "+sys.argv[0]+"` ; exit 0",stderr=subprocess.STDOUT,shell=True)
     scriptgithash = subprocess.check_output("cd "+scriptdirname +";/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
     scriptgitMod  = subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
     if("M" in str(scriptgitMod)):
@@ -428,19 +428,22 @@ def main(argv):
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
     Ni     =refineR*refineS* lenlon
-
+    #Apply finite element correction for cell areas when possible (currently for spherical sub-grids) 
+    latlon_areafix=True
+    #Ensure the number of j partitions are even for the sub-grids
+    ensure_nj_even=True
     #Mercator grid
     #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
     #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
 
-#    if(degree_resolution_inverse == 2):
-#        phi_s_Merc, phi_n_Merc = -68.05725377, 64.76080366
-#    OM4p5 grid is not Mercator around equator and cannot be reproduced by this tool
-     
-    lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon,ensure_nj_even=True)    
-    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees',latlon_areafix=True)
+    if(reproduce_MIDAS_grids):
+        latlon_areafix=False
+        ensure_nj_even=False
+        
+    lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
+    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
     DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
@@ -455,8 +458,14 @@ def main(argv):
     #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
     Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
 
+    if(reproduce_MIDAS_grids):
+        Nj_ncap = refineR* 120 ##MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree)
+        lat0_bp=phi_n_Merc
+        latlon_areafix=False
+        ensure_nj_even=False
+        
     lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
-    dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP,axis_units='degrees')
+    dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
 
     #Southern Ocean grid
     lat0_SO=-78. #Starting lat
@@ -465,8 +474,15 @@ def main(argv):
     #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
     #the first Mercator dy.     
     Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
-    lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
-    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees',latlon_areafix=True)
+
+    if(reproduce_MIDAS_grids):
+        Nj_SO = refineR*  55   #MIDAS has refineS*( 110 for 1/4 degree,  54 for 1/2 degree)
+        lenlat_SO = phi_s_Merc-lat0_SO
+        latlon_areafix=False
+        ensure_nj_even=False
+        
+    lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
+    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
 
     #Southern cap
     #Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
@@ -480,13 +496,20 @@ def main(argv):
 
     if(r_dp == 0.0):
         Nj_scap = int(fullArc/deltaPhiSO)
-        lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO)
+        if(reproduce_MIDAS_grids):
+            Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+
+        lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
     else:
         nparts=8
         Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
-        lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts)
+        if(reproduce_MIDAS_grids):
+            Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+            
+        doughnut=0.12
+        lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
 
-    dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC,axis_units='degrees')
+    dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
 
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
