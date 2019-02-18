@@ -428,8 +428,6 @@ def main(argv):
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
     Ni     =refineR*refineS* lenlon
-    Nj_ncap=refineR* 120 - 1  #MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree
-    #Niki: Where do these factors come from?
 
     #Mercator grid
     #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
@@ -443,21 +441,29 @@ def main(argv):
      
     lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon,ensure_nj_even=True)    
     dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc,axis_units='degrees',latlon_areafix=True)
-    #The phi resolution in the last row of Mercator grid along the symmetry meridian
+    #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
     DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
 
     #Northern bipolar cap
     lon_bp=lon0 # longitude of the displaced pole(s)
-    #The phi resolution in the last row of Mercator grid along the symmetry meridian
+    #Start lattitude from dy above the last Mercator grid
     lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
-    #lat0_bp=phi_n_Merc 
+    #Determine the number of bipolar cap grid point in the y direction such that the y resolution
+    #along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
+    #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic behavior for middle points.
+    #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
+    Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
+
     lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
     dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP,axis_units='degrees')
 
     #Southern Ocean grid
-    lat0_SO=-78.
+    lat0_SO=-78. #Starting lat
+    #Make the last grid point is a (Mercator) step below the first Mercator lattitude.
     lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+    #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
+    #the first Mercator dy.     
     Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
     lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO)
     dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO,axis_units='degrees',latlon_areafix=True)
