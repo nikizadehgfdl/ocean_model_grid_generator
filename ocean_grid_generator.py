@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import matplotlib.pyplot as plt
-import seaborn as sns; sns.set()
 import numpy as np
 import sys, getopt
 import datetime, os, subprocess
+
+#import matplotlib.pyplot as plt
+#import seaborn as sns; sns.set()
 
 #Constants
 PI_180 = np.pi/180.
@@ -233,6 +234,8 @@ def cut_above(lam,phi,upperlat):
 
 #utility function to plot grids
 def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns; sns.set()
     if (phi.shape != lam.shape): raise Exception('Ooops: lam and phi should have same shape')
     nj,ni = lam.shape
     if(newfig):
@@ -243,22 +246,17 @@ def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig
         plt.plot(lam[j,:],phi[j,:],phi_color)
     if title is not None:
         plt.title(title)
-#plot_mesh_in_latlon(lams,phis,stride=16)
-
+    plt.show()
+        
 def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None):
     if lowerlat is not None:
-        lam,phi = cut_below(lam,phi,lowerlat=lowerlat)
-        
+        lam,phi = cut_below(lam,phi,lowerlat=lowerlat)        
     if upperlat is not None:
-        lam,phi = cut_above(lam,phi,upperlat=upperlat)
-        
+        lam,phi = cut_above(lam,phi,upperlat=upperlat)        
     x = np.cos(phi*PI_180) * np.cos(lam*PI_180)
     y = np.cos(phi*PI_180) * np.sin(lam*PI_180)
-    z = np.sin(phi*PI_180)
-        
+    z = np.sin(phi*PI_180)        
     plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title)
-#plt.figure(figsize=(6,6))
-#plot_mesh_in_xyz(lams, phis, stride=20)
 
 def mdist(x1,x2):
   """Returns positive distance modulo 360."""
@@ -370,7 +368,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --plot]')
  
 
 def main(argv):
@@ -384,9 +382,10 @@ def main(argv):
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
+    plotem = False
     
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids"])
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","plot"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -408,6 +407,8 @@ def main(argv):
              r_dp = int(arg)*r_dp
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
+        elif opt in ("--plot"):
+             plotem = True
         else:
             assert False, "unhandled option"
 
@@ -587,14 +588,10 @@ def main(argv):
     write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source)
     print("Wrote the whole grid to file ",gridfilename)
     
-
     #Visualization
-#    plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
-#    plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
-#    plt.show()
-
-    
-
+    if(plotem):
+        plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
+        plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees") 
 
 if __name__ == "__main__":
    main(sys.argv[1:])
