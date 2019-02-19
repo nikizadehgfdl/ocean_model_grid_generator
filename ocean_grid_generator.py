@@ -4,14 +4,10 @@ import numpy as np
 import sys, getopt
 import datetime, os, subprocess
 
-#import matplotlib.pyplot as plt
-#import seaborn as sns; sns.set()
-
 #Constants
 PI_180 = np.pi/180.
 #_default_Re = 6.378e6
 _default_Re = 6371.e3 #MIDAS
-#_default_Re = 6.371e6
 
 def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
@@ -235,7 +231,7 @@ def cut_above(lam,phi,upperlat):
 #utility function to plot grids
 def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None):
     import matplotlib.pyplot as plt
-    import seaborn as sns; sns.set()
+#    import seaborn as sns; sns.set()
     if (phi.shape != lam.shape): raise Exception('Ooops: lam and phi should have same shape')
     nj,ni = lam.shape
     if(newfig):
@@ -433,14 +429,20 @@ def main(argv):
     latlon_areafix=True
     #Ensure the number of j partitions are even for the sub-grids
     ensure_nj_even=True
-    #Mercator grid
-    #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
-    #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
-    #Instead we use:
-    phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
 
-    if(reproduce_MIDAS_grids):
-        lenlonMIDAS = 360. #To use MIDAS this has to be float, otherwise MIDAS grids won't be reproduced
+    ###
+    ###Mercator grid
+    ###
+    if(not reproduce_MIDAS_grids):
+        #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
+        #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
+        #Instead we use:
+        phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
+        
+        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
+        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
+        
+    else: #use pymidas package   
         lat0_Merc=-65.0  # This is a nominal starting latitude for Mercator grid
         lenlat_Merc=125.0  # nominal latitude range of Mercator grid
         Nj_Merc=700*refineS
@@ -450,7 +452,7 @@ def main(argv):
         print ('constructing a mercator supergrid with (ni,nj) = ',nx,ny)
         print ('nominal starting lat and starting longitude =',lat0_Merc, lon0)
         print ('and nominal width in latitude = ',lenlat_Merc)
-        mercator=supergrid(nx,ny,'mercator','degrees',lat0_Merc,lenlat_Merc,lon0,lenlonMIDAS,cyclic_x=True)
+        mercator=supergrid(nx,ny,'mercator','degrees',lat0_Merc,lenlat_Merc,lon0,360.,cyclic_x=True)
         mercator.grid_metrics()
         print ("mercator.y.shape= ",mercator.y.shape)
         print ("mercator max/min latitude=", mercator.y.max(),mercator.y.min())
@@ -459,33 +461,33 @@ def main(argv):
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
 
-    else:    
-        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
-        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
-
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
     DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
 
-    #Northern bipolar cap
+    ###
+    ###Northern bipolar cap
+    ###
     lon_bp=lon0 # longitude of the displaced pole(s)
-    #Start lattitude from dy above the last Mercator grid
-    lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
-    #Determine the number of bipolar cap grid point in the y direction such that the y resolution
-    #along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
-    #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic behavior for middle points.
-    #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
-    Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
 
-    if(reproduce_MIDAS_grids):
+    if(not reproduce_MIDAS_grids):
+        #Start lattitude from dy above the last Mercator grid
+        lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
+        #Determine the number of bipolar cap grid point in the y direction such that the y resolution
+        #along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
+        #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic behavior for middle points.
+        #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
+        Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
+        
+        lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
+        dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
+        
+    else:
+        lat0_bp=mercator.y.max()
         Nj_ncap = refineR* 120 ##MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree)
-        lat0_bp=phi_n_Merc
-        latlon_areafix=False
-        ensure_nj_even=False
-        lat0_tp=mercator.y.max()
-        dlat=90.0-lat0_tp
+        dlat=90.0-lat0_bp
         nx,ny = Ni,Nj_ncap
-        tripolar_n=supergrid(nx,ny,'spherical','degrees',lat0_tp,dlat,lon0,360.,tripolar_n=True)
+        tripolar_n=supergrid(Ni,Nj_ncap,'spherical','degrees',lat0_bp,dlat,lon0,360.,tripolar_n=True)
         tripolar_n.grid_metrics()
         print ("generated a tripolar supergrid of size (ny,nx)= ",tripolar_n.y.shape[0]-1,tripolar_n.y.shape[1]-1)
         print ("tripolar grid starting longitude = ",tripolar_n.x[0,0])
@@ -493,30 +495,28 @@ def main(argv):
 
         lamBP,phiBP = tripolar_n.x,tripolar_n.y
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
-        
-    else:
-        lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
-        dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
 
-    #Southern Ocean grid
+    ###
+    ###Southern Ocean grid
+    ###
     lat0_SO=-78. #Starting lat
-    #Make the last grid point is a (Mercator) step below the first Mercator lattitude.
-    lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
-    #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
-    #the first Mercator dy.     
-    Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
 
-    if(reproduce_MIDAS_grids):
+    if(not reproduce_MIDAS_grids):
+        #Make the last grid point is a (Mercator) step below the first Mercator lattitude.
+        lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+        #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
+        #the first Mercator dy.     
+        Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
+        
+        lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
+        dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
+        
+    else:    
         Nj_SO = refineR*  55   #MIDAS has refineS*( 110 for 1/4 degree,  54 for 1/2 degree)
-        lenlat_SO = phi_s_Merc-lat0_SO
-        lat0_sp = lat0_SO
-        latlon_areafix=False
-        ensure_nj_even=False
         print ('constructing a spherical supergrid with (ny,nx) = ',ny,nx)
-        print ('nominal starting lat and starting longitude =',lat0_sp, lon0)
-        print ('and nominal width in latitude = ',lenlat_SO)
-        nx,ny2 = Ni,Nj_SO
-        spherical=supergrid(nx,ny2,'spherical','degrees',lat0_sp,mercator.y.min()-lat0_sp,lon0,lenlonMIDAS,cyclic_x=True)
+        print ('nominal starting lat and starting longitude =',lat0_SO, lon0)
+        print ('and nominal width in latitude = ',mercator.y.min()-lat0_SO)
+        spherical=supergrid(Ni,Nj_SO,'spherical','degrees',lat0_SO,mercator.y.min()-lat0_SO,lon0,360.,cyclic_x=True)
         spherical.grid_metrics()
         print ("antarctic spherical max/min latitude=", spherical.y.max(),spherical.y.min())
         print ("spherical nj,ni=", spherical.y.shape[0]-1,spherical.y.shape[1]-1)
@@ -525,12 +525,10 @@ def main(argv):
 
         lamSO,phiSO = spherical.x,spherical.y
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
-        
-    else:    
-        lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
-        dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
 
-    #Southern cap
+    ###
+    ###Southern cap
+    ###
     #Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
     #Here we determine Nj_scap by imposing the condition of continuity of dy across the stitch.
     
@@ -550,7 +548,11 @@ def main(argv):
         doughnut=0.12
         nparts=8
         Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
-        if(reproduce_MIDAS_grids):
+        if(not reproduce_MIDAS_grids):
+            lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
+            
+        else:    
             Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             ny_scap = Nj_scap
             r0_pole = 0.20
@@ -560,8 +562,8 @@ def main(argv):
             lenlat=90.0+spherical.y.min()
             dy0=spherical.dy[0,0]*r0_pole
             x=spherical.x[0,:]
-            y=np.linspace(-90.,0.5*(lat0_sp-90.0),ny_scap/8)
-            y=np.concatenate((y,np.linspace(y.max(),lat0_sp,7*ny_scap/8+1)))
+            y=np.linspace(-90.,0.5*(lat0_SO-90.0),ny_scap/8)
+            y=np.concatenate((y,np.linspace(y.max(),lat0_SO,7*ny_scap/8+1)))
             X,Y=np.meshgrid(x,y)
             antarctic_cap=supergrid(xdat=X,ydat=Y,axis_units='degrees',displace_pole=True,r0_pole=r0_pole,lon0_pole=lon0_pole,doughnut=doughnut)                  
             antarctic_cap.grid_metrics()
@@ -569,10 +571,6 @@ def main(argv):
 
             lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
-            
-        else:    
-            lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
-            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
 
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
