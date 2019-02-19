@@ -1,4 +1,5 @@
 TARGS = tripolar_res2.nc \
+        tripolar_res2_MIDAS.nc \
         tripolar_disp_res4.nc \
         tripolar_disp_res4_MIDAS.nc \
 	tripolar_disp_res8.nc
@@ -8,6 +9,8 @@ all: $(TARGS) hash.md5
        
 tripolar_res2.nc: 
 	./ocean_grid_generator.py -f tripolar_res2.nc -r 2 --rdp 0 
+tripolar_res2_MIDAS.nc:
+	./ocean_grid_generator.py -f tripolar_res2_MIDAS.nc -r 2 --rdp 0 --south_cutoff_row 81 --reproduce_MIDAS_grids
 tripolar_disp_res4_MIDAS.nc:
 	./ocean_grid_generator.py -f tripolar_disp_res4_MIDAS.nc -r 4 --south_cutoff_row 81 --reproduce_MIDAS_grids
 tripolar_disp_res4.nc:
