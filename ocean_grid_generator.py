@@ -443,24 +443,69 @@ def main(argv):
         dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
         
     else: #use pymidas package   
-        lat0_Merc=-65.0  # This is a nominal starting latitude for Mercator grid
-        lenlat_Merc=125.0  # nominal latitude range of Mercator grid
-        Nj_Merc=700*refineS
         from pymidas.rectgrid_gen import supergrid
+
+        if(refineR == 2):
+            Nj_Merc    = 364*refineS  
+            lat0_Merc  = -70.0  # This is a nominal starting latitude for Mercator grid
+            lenlat_Merc= 135.0  # nominal latitude range of Mercator grid
+        elif(refineR == 4):    
+            Nj_Merc    = 700*refineS
+            lat0_Merc  = -65.0  # This is a nominal starting latitude for Mercator grid
+            lenlat_Merc= 125.0  # nominal latitude range of Mercator grid
+        else:
+            raise Exception('Unknown resolution for --reproduce_MIDAS_grids')
+        
         #### Begin Mercator Grid
-        nx,ny = Ni,Nj_Merc
-        print ('constructing a mercator supergrid with (ni,nj) = ',nx,ny)
+        print ('constructing a mercator supergrid with (ni,nj) = ',Ni,Nj_Merc)
         print ('nominal starting lat and starting longitude =',lat0_Merc, lon0)
         print ('and nominal width in latitude = ',lenlat_Merc)
-        mercator=supergrid(nx,ny,'mercator','degrees',lat0_Merc,lenlat_Merc,lon0,360.,cyclic_x=True)
-        mercator.grid_metrics()
+        mercator=supergrid(Ni,Nj_Merc,'mercator','degrees',lat0_Merc,lenlat_Merc,lon0,360.,cyclic_x=True)
+
+        #Add equatorial enhancement for 1/2 degree MIDAS grid
+        if(refineR == 2):
+            import scipy.interpolate
+            phi=np.ascontiguousarray( mercator.y[:,0] )
+            dphi=phi[1:]-phi[0:-1]
+            phi=mercator.y[:,0]
+            dphi=phi[1:]-phi[0:-1]
+            jind=np.where(phi>-30.)[0][0]
+            jind=jind+np.mod(jind,2)
+            phi=1.*phi[0:jind]
+            dphi=dphi[0:jind]
+            N=130
+            phi_s = phi[-1]
+            dphi_s = dphi[-1]
+            phi_e = -5.
+            dphi_e = 0.13
+            nodes = [0,1,N-2,N-1]
+            phi_nodes = [phi_s,phi_s+dphi_s,phi_e-dphi_e,phi_e]
+            f2=scipy.interpolate.interp1d(nodes,phi_nodes,kind='cubic')
+            jInd2=np.arange(N, dtype=float)
+            phi2=f2(jInd2)
+            phi=np.concatenate((phi[0:-1],phi2))
+            N=40
+            phi_s = phi[-1]
+            phi2=np.linspace(phi_s,0,N)
+            PHI=np.concatenate((phi[0:-1],phi2))
+            PHI=np.concatenate((PHI[0:-1],-PHI[::-1]))
+            LAMBDA=np.linspace(lon0,lon0+360.,Ni+1)
+            jind=np.where(PHI>-78.)[0][0]
+            jind=jind+np.mod(jind,2)
+            jind2=np.where(PHI>65.)[0][0]
+            jind2=jind2+np.mod(jind2,2)
+            PHI2=PHI[jind:jind2-1]
+            x,y = np.meshgrid(LAMBDA,PHI2)
+            mercator = supergrid(xdat=x,ydat=y,axis_units='degrees',cyclic_x=True)            
+
         print ("mercator.y.shape= ",mercator.y.shape)
         print ("mercator max/min latitude=", mercator.y.max(),mercator.y.min())
         print ("mercator start/end longitude=",mercator.x[0,0],mercator.x[0,-1])
         print ("mercator start/end latitudes=",mercator.y[0,0],mercator.y[-1,0])       
+        mercator.grid_metrics()
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
-
+            
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
     DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
@@ -483,10 +528,16 @@ def main(argv):
         dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
         
     else:
+        if(refineR == 2):
+            Nj_ncap = 119*refineS  
+        elif(refineR == 4):    
+            Nj_ncap = 240*refineS 
+        else:
+            raise Exception('Unknown resolution for --reproduce_MIDAS_grids')
+            
         lat0_bp=mercator.y.max()
-        Nj_ncap = refineR* 120 ##MIDAS has refineS*( 240 for 1/4 degree, 119 for 1/2 degree)
         dlat=90.0-lat0_bp
-        nx,ny = Ni,Nj_ncap
+
         tripolar_n=supergrid(Ni,Nj_ncap,'spherical','degrees',lat0_bp,dlat,lon0,360.,tripolar_n=True)
         tripolar_n.grid_metrics()
         print ("generated a tripolar supergrid of size (ny,nx)= ",tripolar_n.y.shape[0]-1,tripolar_n.y.shape[1]-1)
@@ -511,14 +562,20 @@ def main(argv):
         lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
         dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
         
-    else:    
-        Nj_SO = refineR*  55   #MIDAS has refineS*( 110 for 1/4 degree,  54 for 1/2 degree)
-        print ('constructing a spherical supergrid with (ny,nx) = ',ny,nx)
+    else:
+        if(refineR == 2):
+            Nj_SO = 54*refineS  
+        elif(refineR == 4):    
+            Nj_SO = 110*refineS 
+        else:
+            raise Exception('Unknown resolution for --reproduce_MIDAS_grids. Use either -r 2 or -r 4 ')
+            
+        print ('constructing a spherical supergrid with (ny,nx) = ',Ni,Nj_SO)
         print ('nominal starting lat and starting longitude =',lat0_SO, lon0)
         print ('and nominal width in latitude = ',mercator.y.min()-lat0_SO)
         spherical=supergrid(Ni,Nj_SO,'spherical','degrees',lat0_SO,mercator.y.min()-lat0_SO,lon0,360.,cyclic_x=True)
         spherical.grid_metrics()
-        print ("antarctic spherical max/min latitude=", spherical.y.max(),spherical.y.min())
+        print ("southern ocean spherical max/min latitude=", spherical.y.max(),spherical.y.min())
         print ("spherical nj,ni=", spherical.y.shape[0]-1,spherical.y.shape[1]-1)
         print ("spherical starting longitude=",spherical.x[0,0])
         print ("spherical ending longitude=",spherical.x[0,-1])
@@ -540,10 +597,21 @@ def main(argv):
 
     if(r_dp == 0.0):
         Nj_scap = int(fullArc/deltaPhiSO)
-        if(reproduce_MIDAS_grids):
+        if(not reproduce_MIDAS_grids):
+            lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
+        else:
             Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+            spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
+            spherical_cap.grid_metrics()
+            print ("spherical cap max/min latitude=", spherical_cap.y.max(),spherical_cap.y.min())
+            print ("spherical cap nj,ni=", spherical_cap.y.shape[0]-1,spherical_cap.y.shape[1]-1)
+            print ("spherical cap starting longitude=",spherical_cap.x[0,0])
+            print ("spherical cap ending longitude=",spherical_cap.x[0,-1])
 
-        lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
+            lamSC,phiSC = spherical_cap.x,spherical_cap.y
+            dxSC,dySC,areaSC,angleSC =spherical_cap.dx,spherical_cap.dy,spherical_cap.area,spherical_cap.angle_dx
+
     else:
         doughnut=0.12
         nparts=8
