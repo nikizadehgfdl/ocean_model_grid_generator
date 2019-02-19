@@ -416,8 +416,8 @@ def main(argv):
     scriptpath = sys.argv[0]
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
-    scriptgithash = subprocess.check_output("cd "+scriptdirname +";/usr/local/x64/git-2.4.6/bin/git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
-    scriptgitMod  = subprocess.check_output("/usr/local/x64/git-2.4.6/bin/git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+    scriptgithash = subprocess.check_output("cd "+scriptdirname +";git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+    scriptgitMod  = subprocess.check_output("git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
     if("M" in str(scriptgitMod)):
         scriptgitMod = " , But was localy Modified!"
     
@@ -440,11 +440,29 @@ def main(argv):
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
 
     if(reproduce_MIDAS_grids):
-        latlon_areafix=False
-        ensure_nj_even=False
-        
-    lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
-    dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
+        lenlonMIDAS = 360. #To use MIDAS this has to be float, otherwise MIDAS grids won't be reproduced
+        lat0_Merc=-65.0  # This is a nominal starting latitude for Mercator grid
+        lenlat_Merc=125.0  # nominal latitude range of Mercator grid
+        Nj_Merc=700*refineS
+        from pymidas.rectgrid_gen import supergrid
+        #### Begin Mercator Grid
+        nx,ny = Ni,Nj_Merc
+        print ('constructing a mercator supergrid with (ni,nj) = ',nx,ny)
+        print ('nominal starting lat and starting longitude =',lat0_Merc, lon0)
+        print ('and nominal width in latitude = ',lenlat_Merc)
+        mercator=supergrid(nx,ny,'mercator','degrees',lat0_Merc,lenlat_Merc,lon0,lenlonMIDAS,cyclic_x=True)
+        mercator.grid_metrics()
+        print ("mercator.y.shape= ",mercator.y.shape)
+        print ("mercator max/min latitude=", mercator.y.max(),mercator.y.min())
+        print ("mercator start/end longitude=",mercator.x[0,0],mercator.x[0,-1])
+        print ("mercator start/end latitudes=",mercator.y[0,0],mercator.y[-1,0])       
+        lamMerc,phiMerc = mercator.x,mercator.y
+        dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
+
+    else:    
+        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
+        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
+
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
     DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
@@ -464,9 +482,21 @@ def main(argv):
         lat0_bp=phi_n_Merc
         latlon_areafix=False
         ensure_nj_even=False
+        lat0_tp=mercator.y.max()
+        dlat=90.0-lat0_tp
+        nx,ny = Ni,Nj_ncap
+        tripolar_n=supergrid(nx,ny,'spherical','degrees',lat0_tp,dlat,lon0,360.,tripolar_n=True)
+        tripolar_n.grid_metrics()
+        print ("generated a tripolar supergrid of size (ny,nx)= ",tripolar_n.y.shape[0]-1,tripolar_n.y.shape[1]-1)
+        print ("tripolar grid starting longitude = ",tripolar_n.x[0,0])
+        print ("tripolar grid starting latitude = ",tripolar_n.y[0,0])
+
+        lamBP,phiBP = tripolar_n.x,tripolar_n.y
+        dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
         
-    lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
-    dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
+    else:
+        lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
+        dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
 
     #Southern Ocean grid
     lat0_SO=-78. #Starting lat
@@ -479,11 +509,26 @@ def main(argv):
     if(reproduce_MIDAS_grids):
         Nj_SO = refineR*  55   #MIDAS has refineS*( 110 for 1/4 degree,  54 for 1/2 degree)
         lenlat_SO = phi_s_Merc-lat0_SO
+        lat0_sp = lat0_SO
         latlon_areafix=False
         ensure_nj_even=False
+        print ('constructing a spherical supergrid with (ny,nx) = ',ny,nx)
+        print ('nominal starting lat and starting longitude =',lat0_sp, lon0)
+        print ('and nominal width in latitude = ',lenlat_SO)
+        nx,ny2 = Ni,Nj_SO
+        spherical=supergrid(nx,ny2,'spherical','degrees',lat0_sp,mercator.y.min()-lat0_sp,lon0,lenlonMIDAS,cyclic_x=True)
+        spherical.grid_metrics()
+        print ("antarctic spherical max/min latitude=", spherical.y.max(),spherical.y.min())
+        print ("spherical nj,ni=", spherical.y.shape[0]-1,spherical.y.shape[1]-1)
+        print ("spherical starting longitude=",spherical.x[0,0])
+        print ("spherical ending longitude=",spherical.x[0,-1])
+
+        lamSO,phiSO = spherical.x,spherical.y
+        dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
         
-    lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
-    dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
+    else:    
+        lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
+        dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
 
     #Southern cap
     #Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
@@ -502,15 +547,32 @@ def main(argv):
 
         lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
     else:
+        doughnut=0.12
         nparts=8
         Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
         if(reproduce_MIDAS_grids):
             Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
-            
-        doughnut=0.12
-        lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
+            ny_scap = Nj_scap
+            r0_pole = 0.20
+            lon0_pole=100.0
 
-    dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
+            print( spherical.dy.shape)
+            lenlat=90.0+spherical.y.min()
+            dy0=spherical.dy[0,0]*r0_pole
+            x=spherical.x[0,:]
+            y=np.linspace(-90.,0.5*(lat0_sp-90.0),ny_scap/8)
+            y=np.concatenate((y,np.linspace(y.max(),lat0_sp,7*ny_scap/8+1)))
+            X,Y=np.meshgrid(x,y)
+            antarctic_cap=supergrid(xdat=X,ydat=Y,axis_units='degrees',displace_pole=True,r0_pole=r0_pole,lon0_pole=lon0_pole,doughnut=doughnut)                  
+            antarctic_cap.grid_metrics()
+            print( "generated a southern cap of size (ny,nx)= ",antarctic_cap.y.shape[0]-1,antarctic_cap.y.shape[1]-1)
+
+            lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
+            dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
+            
+        else:    
+            lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
 
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
@@ -563,7 +625,7 @@ def main(argv):
     hist = "This grid file was generated on "+ str(datetime.date.today()) + " via command " + ' '.join(sys.argv)
     desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
 
-    desc = desc + "It consists of a Mercator grid spanning "+ str(phi_s_Merc) + " to " + str(phi_n_Merc) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phi_s_Merc) + " to " + str(lat0_SO)+" degrees. "
+    desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "
 
     desc = desc + "It is capped by a "
     if(r_dp != 0.0): 
