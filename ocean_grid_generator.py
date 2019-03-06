@@ -464,6 +464,7 @@ def main(argv):
 
         #Add equatorial enhancement for 1/2 degree MIDAS grid
         if(refineR == 2):
+            print ('Enhancing the equator resolution')
             import scipy.interpolate
             phi=np.ascontiguousarray( mercator.y[:,0] )
             dphi=phi[1:]-phi[0:-1]
@@ -483,10 +484,14 @@ def main(argv):
             f2=scipy.interpolate.interp1d(nodes,phi_nodes,kind='cubic')
             jInd2=np.arange(N, dtype=float)
             phi2=f2(jInd2)
+            print("Meridional range of pure Mercator=(", phi[0],",", phi[-2],") U (", -phi[-2],",", -phi[0],")." )
+            print("Meridional range of cubic interpolation=(", phi2[0],"," , phi2[-2],") U (",-phi2[-2],",",-phi2[0],")." )
             phi=np.concatenate((phi[0:-1],phi2))
             N=40
             phi_s = phi[-1]
             phi2=np.linspace(phi_s,0,N)
+            print("Meridional range of enhanced resolution=(", phi2[0],",", -phi2[0],").")
+            print("Meridional value of enhanced resolution=", phi2[1]-phi2[0])
             PHI=np.concatenate((phi[0:-1],phi2))
             PHI=np.concatenate((PHI[0:-1],-PHI[::-1]))
             LAMBDA=np.linspace(lon0,lon0+360.,Ni+1)
