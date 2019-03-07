@@ -5,8 +5,8 @@ TARGS = tripolar_res2.nc \
 	tripolar_res8_repold8.nc \
 	tripolar_disp_res8.nc
 
-all: $(TARGS) hash.md5.githubTravisCI
-	md5sum -c hash.md5.githubTravisCI 
+all: $(TARGS) hash.md5
+	md5sum -c hash.md5
        
 tripolar_res2.nc: 
 	./ocean_grid_generator.py -f tripolar_res2.nc -r 2 --rdp 0 
@@ -22,9 +22,12 @@ tripolar_res8_repold8.nc:
 	./ocean_grid_generator.py -f tripolar_res8_repold8.nc -r 8 --reproduce_old8_grids
        
 
-hash.md5.githubTravisCI: | $(TARGS)
+hash.md5: | $(TARGS)
 	md5sum $(TARGS) > $@
 	cat $@
+
+check:
+	md5sum -c hash.md5
 
 clean:
 	rm -f $(TARGS) $(DEPS) pickle.*        
