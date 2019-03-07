@@ -2,6 +2,7 @@ TARGS = tripolar_res2.nc \
         tripolar_res2_MIDAS.nc \
         tripolar_disp_res4.nc \
         tripolar_disp_res4_MIDAS.nc \
+	tripolar_res8_repold8.nc \
 	tripolar_disp_res8.nc
 
 all: $(TARGS) hash.md5
@@ -16,11 +17,14 @@ tripolar_disp_res4_MIDAS.nc:
 tripolar_disp_res4.nc:
 	./ocean_grid_generator.py -f tripolar_disp_res4.nc -r 4 --south_cutoff_row 81 
 tripolar_disp_res8.nc:
-	./ocean_grid_generator.py -f tripolar_disp_res8.nc -r 8
+	./ocean_grid_generator.py -f tripolar_disp_res8.nc -r 8 --write_subgrid_files
+tripolar_res8_repold8.nc:
+	./ocean_grid_generator.py -f tripolar_res8_repold8.nc -r 8 --reproduce_old8_grids
        
 
 hash.md5: | $(TARGS)
 	md5sum $(TARGS) > $@
+	cat hash.md5
 
 clean:
 	rm -f $(TARGS) $(DEPS) pickle.*        

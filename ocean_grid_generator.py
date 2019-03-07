@@ -364,7 +364,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --plot]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --reproduce_old8_grids --plot --write_subgrid_files]')
  
 
 def main(argv):
@@ -378,10 +378,12 @@ def main(argv):
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
+    reproduce_old8_grids = False
+    write_subgrid_files = False
     plotem = False
     
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","plot"])
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -403,12 +405,17 @@ def main(argv):
              r_dp = int(arg)*r_dp
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
+        elif opt in ("--reproduce_old8_grids"):
+             reproduce_old8_grids = True
         elif opt in ("--plot"):
              plotem = True
+        elif opt in ("--write_subgrid_files"):
+             write_subgrid_files = True
         else:
             assert False, "unhandled option"
 
-            
+
+    #Information to write in file as metadata
     scriptpath = sys.argv[0]
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
@@ -416,6 +423,13 @@ def main(argv):
     scriptgitMod  = subprocess.check_output("git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
     if("M" in str(scriptgitMod)):
         scriptgitMod = " , But was localy Modified!"
+
+    hist = "This grid file was generated on "+ str(datetime.date.today()) + " via command " + ' '.join(sys.argv)
+    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
+        
+    source =  scriptpath + " had git hash " + scriptgithash + scriptgitMod 
+    source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
+
     
     # Specify the grid properties
     # All
@@ -429,16 +443,19 @@ def main(argv):
     latlon_areafix=True
     #Ensure the number of j partitions are even for the sub-grids
     ensure_nj_even=True
+    if(reproduce_old8_grids):
+        ensure_nj_even=False
+        latlon_areafix=False
+ 
+    #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
+    #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
+    #Instead we use:
+    phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
 
     ###
     ###Mercator grid
     ###
     if(not reproduce_MIDAS_grids):
-        #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
-        #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
-        #Instead we use:
-        phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
-        
         lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
         dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
         
@@ -511,6 +528,9 @@ def main(argv):
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
             
+    if(write_subgrid_files):
+        write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam="Merc_"+gridfilename,description=desc,history=hist,source=source)
+
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
     DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
@@ -529,6 +549,10 @@ def main(argv):
         #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
         Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
         
+        if(reproduce_old8_grids):
+            Nj_ncap=refineR* 120 
+            lat0_bp=phi_n_Merc
+
         lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
         dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
         
@@ -552,6 +576,8 @@ def main(argv):
         lamBP,phiBP = tripolar_n.x,tripolar_n.y
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
 
+    if(write_subgrid_files):
+        write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam="BP_"+gridfilename,description=desc,history=hist,source=source)
     ###
     ###Southern Ocean grid
     ###
@@ -563,7 +589,11 @@ def main(argv):
         #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
         #the first Mercator dy.     
         Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
-        
+
+        if(reproduce_old8_grids):
+            lenlat_SO = phi_s_Merc-lat0_SO
+            Nj_SO  =refineR*  55
+
         lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
         dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
         
@@ -588,6 +618,8 @@ def main(argv):
         lamSO,phiSO = spherical.x,spherical.y
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
 
+    if(write_subgrid_files):
+        write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam="SO_"+gridfilename,description=desc,history=hist,source=source)
     ###
     ###Southern cap
     ###
@@ -601,8 +633,12 @@ def main(argv):
     halfArc = fullArc/2
 
     if(r_dp == 0.0):
-        Nj_scap = int(fullArc/deltaPhiSO)
         if(not reproduce_MIDAS_grids):
+            Nj_scap = int(fullArc/deltaPhiSO)
+            if(reproduce_old8_grids):
+                Nj_scap=refineR*  40
+                lat0_SC=lat0_SO
+
             lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
             dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
         else:
@@ -622,6 +658,10 @@ def main(argv):
         nparts=8
         Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
         if(not reproduce_MIDAS_grids):
+            if(reproduce_old8_grids):
+                Nj_scap=refineR*  40
+                lat0_SC=lat0_SO
+
             lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
             dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
             
@@ -645,6 +685,8 @@ def main(argv):
             lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
+    if(write_subgrid_files):
+        write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam="SC_"+gridfilename,description=desc,history=hist,source=source)
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
     print("Stitching the grids together...")
@@ -691,11 +733,7 @@ def main(argv):
         angle3 = angle3[jcut:,:]
         
         
-        
-    #write the grid file    
-    hist = "This grid file was generated on "+ str(datetime.date.today()) + " via command " + ' '.join(sys.argv)
-    desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
-
+    #write the whole grid file    
     desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "
 
     desc = desc + "It is capped by a "
@@ -711,8 +749,6 @@ def main(argv):
     if(south_cutoff_row > 0):
         desc = desc + " The first "+ str(south_cutoff_row) +" rows at south are deleted."
     
-    source =  scriptpath + " had git hash " + scriptgithash + scriptgitMod 
-    source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
 
 #    print(hist)
 #    print(desc)
@@ -728,3 +764,4 @@ def main(argv):
 
 if __name__ == "__main__":
    main(sys.argv[1:])
+
