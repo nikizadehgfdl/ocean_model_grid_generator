@@ -381,9 +381,10 @@ def main(argv):
     reproduce_old8_grids = False
     write_subgrid_files = False
     plotem = False
-    
+    no_changing_meta = False
+
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files"])
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files","no_changing_meta"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -411,11 +412,15 @@ def main(argv):
              plotem = True
         elif opt in ("--write_subgrid_files"):
              write_subgrid_files = True
+        elif opt in ("--no_changing_meta"):
+             no_changing_meta = True
         else:
             assert False, "unhandled option"
 
 
     #Information to write in file as metadata
+    import socket
+    host = str(socket.gethostname())
     scriptpath = sys.argv[0]
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
@@ -424,11 +429,16 @@ def main(argv):
     if("M" in str(scriptgitMod)):
         scriptgitMod = " , But was localy Modified!"
 
-    hist = "This grid file was generated on "+ str(datetime.date.today()) + " via command " + ' '.join(sys.argv)
+    hist = "This grid file was generated via command " + ' '.join(sys.argv)
+    if(not no_changing_meta):
+        hist = hist + " on "+ str(datetime.date.today()) + " on platform "+ host
+
     desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
-        
-    source =  scriptpath + " had git hash " + scriptgithash + scriptgitMod 
-    source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
+    
+    source =""
+    if(not no_changing_meta):
+        source =  source + scriptpath + " had git hash " + scriptgithash + scriptgitMod 
+        source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
 
     
     # Specify the grid properties
@@ -529,7 +539,7 @@ def main(argv):
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
             
     if(write_subgrid_files):
-        write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam="Merc_"+gridfilename,description=desc,history=hist,source=source)
+        write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source)
 
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
@@ -577,7 +587,7 @@ def main(argv):
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
 
     if(write_subgrid_files):
-        write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam="BP_"+gridfilename,description=desc,history=hist,source=source)
+        write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source)
     ###
     ###Southern Ocean grid
     ###
@@ -619,7 +629,7 @@ def main(argv):
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
 
     if(write_subgrid_files):
-        write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam="SO_"+gridfilename,description=desc,history=hist,source=source)
+        write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source)
     ###
     ###Southern cap
     ###
@@ -686,7 +696,7 @@ def main(argv):
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
     if(write_subgrid_files):
-        write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam="SC_"+gridfilename,description=desc,history=hist,source=source)
+        write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source)
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
     print("Stitching the grids together...")
