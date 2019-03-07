@@ -1,0 +1,10 @@
+On gfdl pan the following were checked identical
+nccmp -d tripolar_res2_MIDAS.nc  /archive/gold/datasets/OM4_05/mosaic_ocean.v20180227.unpacked/ocean_hgrid.nc    
+nccmp -d tripolar_disp_res4_MIDAS.nc  /archive/gold/datasets/OM4_025/mosaic.v20170622.unpacked/ocean_hgrid.nc
+
+On gfdl workstation I get
+nccmp -d tripolar_res8_repold8.nc  /archive/Niki.Zadeh/input/xanadu/OM4p125_grid/unpacked/ocean_hgrid.nc
+DIFFER : VARIABLE : y : POSITION : 1 1362 : VALUES : -83.4759 <> -83.4759
+
+This means something has changed in my python envoirons since I produced that grid in July2018
+
