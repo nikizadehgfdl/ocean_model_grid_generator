@@ -397,7 +397,7 @@ def main(argv):
         elif opt in ("-f", "--gridfilename"):
             gridfilename = arg
         elif opt in ("-r", "--inverse_resolution"):
-            degree_resolution_inverse = int(arg)
+            degree_resolution_inverse = float(arg)
         elif opt in ("--south_cutoff_ang"):
             south_cutoff_ang = float(arg)
         elif opt in ("--south_cutoff_row"):
@@ -425,7 +425,7 @@ def main(argv):
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptgithash = subprocess.check_output("cd "+scriptdirname +";git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
-    scriptgitMod  = subprocess.check_output("git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+    scriptgitMod  = subprocess.check_output("cd "+scriptdirname +";git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
     if("M" in str(scriptgitMod)):
         scriptgitMod = " , But was localy Modified!"
 
@@ -448,7 +448,7 @@ def main(argv):
     refineR=degree_resolution_inverse   
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
-    Ni     =refineR*refineS* lenlon
+    Ni=int(refineR*refineS* lenlon)
     #Apply finite element correction for cell areas when possible (currently for spherical sub-grids) 
     latlon_areafix=True
     #Ensure the number of j partitions are even for the sub-grids
