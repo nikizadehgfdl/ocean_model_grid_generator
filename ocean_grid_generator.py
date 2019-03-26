@@ -560,7 +560,7 @@ def main(argv):
         Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
         
         if(reproduce_old8_grids):
-            Nj_ncap=refineR* 120 
+            Nj_ncap=int(refineR* 120)
             lat0_bp=phi_n_Merc
 
         lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
@@ -602,7 +602,7 @@ def main(argv):
 
         if(reproduce_old8_grids):
             lenlat_SO = phi_s_Merc-lat0_SO
-            Nj_SO  =refineR*  55
+            Nj_SO  =int(refineR*  55)
 
         lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
         dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
@@ -646,13 +646,13 @@ def main(argv):
         if(not reproduce_MIDAS_grids):
             Nj_scap = int(fullArc/deltaPhiSO)
             if(reproduce_old8_grids):
-                Nj_scap=refineR*  40
+                Nj_scap=int(refineR*  40)
                 lat0_SC=lat0_SO
 
             lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
             dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
         else:
-            Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+            Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
             spherical_cap.grid_metrics()
             print ("spherical cap max/min latitude=", spherical_cap.y.max(),spherical_cap.y.min())
@@ -669,14 +669,14 @@ def main(argv):
         Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
         if(not reproduce_MIDAS_grids):
             if(reproduce_old8_grids):
-                Nj_scap=refineR*  40
+                Nj_scap=int(refineR*  40)
                 lat0_SC=lat0_SO
 
             lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
             dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
             
         else:    
-            Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+            Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             ny_scap = Nj_scap
             r0_pole = 0.20
             lon0_pole=100.0
