@@ -125,7 +125,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_poi
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
             print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
-    if((y_star[1]-y_star[0]+1)%2 != 0 and ensure_nj_even):
+    if((y_star[1]-y_star[0]+1)%2 == 0 and ensure_nj_even):
         print("   Supergrid has an odd number of area cells!")
         if(ensure_nj_even):
             print("   Fixing this by shifting the y_star[1] ")
@@ -158,7 +158,7 @@ def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doug
     x=lon0 + np.arange(Ni+1) * lenlon/Ni
     y=np.linspace(-90.,0.5*(lat0_SO-90.0),Nj_scap//nparts)
     y=np.concatenate((y,np.linspace(y.max(),lat0_SO,1+Nj_scap*(nparts-1)//nparts)))
-    if(y.shape[0]%2 != 0 and ensure_nj_even):
+    if(y.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
         y = np.delete(y,0,0)
     X1,Y1=np.meshgrid(x,y)
@@ -352,7 +352,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     print('Generating regular lat-lon grid between latitudes ', llat0, llat0+llen_lat)
     llonSP = llon0 + np.arange(lni+1) * llen_lon/lni
     llatSP = llat0 + np.arange(lnj+1) * llen_lat/lnj
-    if(llatSP.shape[0]%2 != 0 and ensure_nj_even):
+    if(llatSP.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
         llatSP = np.delete(llatSP,0,0)
     
