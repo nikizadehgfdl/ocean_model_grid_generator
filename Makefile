@@ -6,6 +6,7 @@ TARGS = tripolar_res2.nc \
 	tripolar_disp_res8.nc
 
 all: $(TARGS) hash.md5
+	cat hash.md5
 	md5sum -c hash.md5
        
 #Note: --no_changing_meta arg is used to avoid putting time/platform dependent info in the files so that they can  be checksumed.
