@@ -1,6 +1,8 @@
-33df94a4b7a1bfa5d4f6ac3d5592dbe5  tripolar_res2.nc
-190433239c6b98afeb957e0ccdcea8ac  tripolar_res2_MIDAS.nc
-2b0769dd88274a78eb24f255c0cc4e47  tripolar_disp_res4.nc
-d6af2363f437d575e2f59e5ec737ae34  tripolar_disp_res4_MIDAS.nc
-32acc2f57746df53b3abfb85d19336fc  tripolar_res8_repold8.nc
-306a78ad8eae5046d1a7b89d3b406c13  tripolar_disp_res8.nc
+feb33b1b992e2307ece85ded2f0871c5  ocean_hgrid_res4.0.nc
+5f72939d7099131f2a62cf82a173c977  ocean_hgrid_res1.0.nc
+e8a7f513d4407656e282d0d39da0906d  ocean_hgrid_res0.5.nc
+a1083fe000e2fc7ba2e03eb3e1ca1037  ocean_hgrid_res0.5_MIDAS.nc
+5813ec5c6fe68f3c357df2491fc4f45b  ocean_hgrid_res0.25_MIDAS.nc
+780740f8c23f56ccec24b2aa24897d6d  ocean_hgrid_res0.25.nc
+f8ea0edcda358b95bc49625bad0de338  ocean_hgrid_res0.125.nc
+3f9433d7a2cbb1c910bde6d08d068cfc  ocean_hgrid_res0.125_old.nc
