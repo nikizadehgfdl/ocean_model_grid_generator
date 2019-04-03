@@ -298,7 +298,7 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
     return dx,dy,area,angle_dx
 
 
-def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC',description=None,history=None,source=None):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC',description=None,history=None,source=None,no_changing_meta=None):
     import netCDF4 as nc
 
     if fnam is None:
@@ -340,9 +340,10 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     anglev.units='degrees'
     anglev[:]=angle_dx
     #global attributes
-    fout.history = history
-    fout.description = description
-    fout.source =  source
+    if(not no_changing_meta):
+    	fout.history = history
+    	fout.description = description
+    	fout.source =  source
 
     fout.sync()
     fout.close()
@@ -763,7 +764,7 @@ def main(argv):
 #    print(desc)
 #    print(source)
 
-    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source)
+    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta)
     print("Wrote the whole grid to file ",gridfilename)
     
     #Visualization
