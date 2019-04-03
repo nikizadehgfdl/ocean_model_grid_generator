@@ -1,10 +1,21 @@
-On gfdl pan the following were checked identical
-nccmp -d tripolar_res2_MIDAS.nc  /archive/gold/datasets/OM4_05/mosaic_ocean.v20180227.unpacked/ocean_hgrid.nc    
+#On gfdl pan the following were checked identical
+
+#To reproduce MIDAS grids:
+#OM4p25
+module load python/2.7.3_workstation
+/work/Niki.Zadeh/grid_generation/ocean_grid_generator.py -f OM4p25_hgrid_MIDAS.nc -r 4 --south_cutoff_row 81 --reproduce_MIDAS_grids --write_subgrid_files
 nccmp -d tripolar_disp_res4_MIDAS.nc  /archive/gold/datasets/OM4_025/mosaic.v20170622.unpacked/ocean_hgrid.nc
 
-On gfdl workstation I get
-nccmp -d tripolar_res8_repold8.nc  /archive/Niki.Zadeh/input/xanadu/OM4p125_grid/unpacked/ocean_hgrid.nc
-DIFFER : VARIABLE : y : POSITION : 1 1362 : VALUES : -83.4759 <> -83.4759
+#OM4p5
+module load python/2.7.3_workstation
+/work/Niki.Zadeh/grid_generation/ocean_grid_generator.py -f tripolar_res2_MIDAS.nc -r 2 --rdp 0 --south_cutoff_row 81 --reproduce_MIDAS_grids --write_subgrid_files
+nccmp -d tripolar_res2_MIDAS.nc  /archive/gold/datasets/OM4_05/mosaic_ocean.v20180227.unpacked/ocean_hgrid.nc    
 
-This means something has changed in my python envoirons since I produced that grid in July2018
+#To reproduce 1/8 degree JRA grid
+module load python/3.6.4    #Note the version
+/work/Niki.Zadeh/grid_generation/ocean_grid_generator.py -f tripolar_disp_res8.nc -r 8 --write_subgrid_files --reproduce_old8_grids --write_subgrid_files
 
+#On gfdl workstation I get
+#nccmp -d tripolar_res8_repold8.nc  /archive/Niki.Zadeh/input/xanadu/OM4p125_grid/unpacked/ocean_hgrid.nc
+#DIFFER : VARIABLE : y : POSITION : 1 1362 : VALUES : -83.4759 <> -83.4759
+#This means something has changed in my python envoirons since I produced that grid in July2018

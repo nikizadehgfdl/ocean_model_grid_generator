@@ -454,7 +454,6 @@ def main(argv):
     #Ensure the number of j partitions are even for the sub-grids
     ensure_nj_even=True
     if(reproduce_old8_grids):
-        ensure_nj_even=False
         latlon_areafix=False
  
     #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
