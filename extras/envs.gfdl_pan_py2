@@ -1,0 +1,5 @@
+# Modules needed on PAN
+source $MODULESHOME/init/csh
+module use -a /home/fms/local/modulefiles
+module unload python netcdf nco
+module load python/2.7.3_workstation

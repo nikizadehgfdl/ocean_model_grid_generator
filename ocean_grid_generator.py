@@ -125,7 +125,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_poi
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
             print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
-    if((y_star[1]-y_star[0]+1)%2 != 0 and ensure_nj_even):
+    if((y_star[1]-y_star[0]+1)%2 == 0 and ensure_nj_even):
         print("   Supergrid has an odd number of area cells!")
         if(ensure_nj_even):
             print("   Fixing this by shifting the y_star[1] ")
@@ -158,7 +158,7 @@ def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doug
     x=lon0 + np.arange(Ni+1) * lenlon/Ni
     y=np.linspace(-90.,0.5*(lat0_SO-90.0),Nj_scap//nparts)
     y=np.concatenate((y,np.linspace(y.max(),lat0_SO,1+Nj_scap*(nparts-1)//nparts)))
-    if(y.shape[0]%2 != 0 and ensure_nj_even):
+    if(y.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
         y = np.delete(y,0,0)
     X1,Y1=np.meshgrid(x,y)
@@ -298,7 +298,7 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
     return dx,dy,area,angle_dx
 
 
-def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC',description=None,history=None,source=None):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC',description=None,history=None,source=None,no_changing_meta=None):
     import netCDF4 as nc
 
     if fnam is None:
@@ -340,9 +340,10 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     anglev.units='degrees'
     anglev[:]=angle_dx
     #global attributes
-    fout.history = history
-    fout.description = description
-    fout.source =  source
+    if(not no_changing_meta):
+    	fout.history = history
+    	fout.description = description
+    	fout.source =  source
 
     fout.sync()
     fout.close()
@@ -352,7 +353,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     print('Generating regular lat-lon grid between latitudes ', llat0, llat0+llen_lat)
     llonSP = llon0 + np.arange(lni+1) * llen_lon/lni
     llatSP = llat0 + np.arange(lnj+1) * llen_lat/lnj
-    if(llatSP.shape[0]%2 != 0 and ensure_nj_even):
+    if(llatSP.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
         llatSP = np.delete(llatSP,0,0)
     
@@ -397,7 +398,7 @@ def main(argv):
         elif opt in ("-f", "--gridfilename"):
             gridfilename = arg
         elif opt in ("-r", "--inverse_resolution"):
-            degree_resolution_inverse = int(arg)
+            degree_resolution_inverse = float(arg)
         elif opt in ("--south_cutoff_ang"):
             south_cutoff_ang = float(arg)
         elif opt in ("--south_cutoff_row"):
@@ -425,7 +426,7 @@ def main(argv):
     scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
     scriptgithash = subprocess.check_output("cd "+scriptdirname +";git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
-    scriptgitMod  = subprocess.check_output("git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+    scriptgitMod  = subprocess.check_output("cd "+scriptdirname +";git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
     if("M" in str(scriptgitMod)):
         scriptgitMod = " , But was localy Modified!"
 
@@ -448,13 +449,12 @@ def main(argv):
     refineR=degree_resolution_inverse   
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude (longitude of the Northern bipoles)
-    Ni     =refineR*refineS* lenlon
+    Ni=int(refineR*refineS* lenlon)
     #Apply finite element correction for cell areas when possible (currently for spherical sub-grids) 
     latlon_areafix=True
     #Ensure the number of j partitions are even for the sub-grids
     ensure_nj_even=True
     if(reproduce_old8_grids):
-        ensure_nj_even=False
         latlon_areafix=False
  
     #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
@@ -560,7 +560,7 @@ def main(argv):
         Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
         
         if(reproduce_old8_grids):
-            Nj_ncap=refineR* 120 
+            Nj_ncap=int(refineR* 120)
             lat0_bp=phi_n_Merc
 
         lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
@@ -602,7 +602,7 @@ def main(argv):
 
         if(reproduce_old8_grids):
             lenlat_SO = phi_s_Merc-lat0_SO
-            Nj_SO  =refineR*  55
+            Nj_SO  =int(refineR*  55)
 
         lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
         dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
@@ -646,13 +646,13 @@ def main(argv):
         if(not reproduce_MIDAS_grids):
             Nj_scap = int(fullArc/deltaPhiSO)
             if(reproduce_old8_grids):
-                Nj_scap=refineR*  40
+                Nj_scap=int(refineR*  40)
                 lat0_SC=lat0_SO
 
             lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
             dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
         else:
-            Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+            Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
             spherical_cap.grid_metrics()
             print ("spherical cap max/min latitude=", spherical_cap.y.max(),spherical_cap.y.min())
@@ -669,14 +669,14 @@ def main(argv):
         Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
         if(not reproduce_MIDAS_grids):
             if(reproduce_old8_grids):
-                Nj_scap=refineR*  40
+                Nj_scap=int(refineR*  40)
                 lat0_SC=lat0_SO
 
             lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
             dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
             
         else:    
-            Nj_scap = refineR *  40   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+            Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             ny_scap = Nj_scap
             r0_pole = 0.20
             lon0_pole=100.0
@@ -764,7 +764,7 @@ def main(argv):
 #    print(desc)
 #    print(source)
 
-    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source)
+    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta)
     print("Wrote the whole grid to file ",gridfilename)
     
     #Visualization
