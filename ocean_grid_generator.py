@@ -298,7 +298,7 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
     return dx,dy,area,angle_dx
 
 
-def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_CLASSIC',description=None,history=None,source=None,no_changing_meta=None):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_changing_meta=None):
     import netCDF4 as nc
 
     if fnam is None:
