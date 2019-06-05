@@ -124,7 +124,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_poi
             print("   Fixing this by shifting the bounds!")
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
-            print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
+            print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
     if((y_star[1]-y_star[0]+1)%2 == 0 and ensure_nj_even):
         print("   Supergrid has an odd number of area cells!")
         if(ensure_nj_even):
@@ -296,6 +296,25 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
     angle_dx[:,-1]   = np.arctan2(y[:,-1]-y[:,-2] ,(x[:,-1]-x[:,-2] )*np.cos(y[:,-1]*PI_180))
     angle_dx = angle_dx /PI_180
     return dx,dy,area,angle_dx
+
+def metrics_error(dx_,dy_,area_,Ni,lat1,lat2=90,Re=_default_Re):
+    exact_area = 2*np.pi*(Re**2)*np.abs(np.sin(lat2*PI_180)-np.sin(lat1*PI_180))
+    exact_lat_arc_length = np.abs(lat2-lat1)*PI_180*Re  
+    exact_lon_arc_length = np.cos(lat1*PI_180) *2*np.pi*Re
+
+#    if(lat2 == -90): #displaced pole?
+#        grid_lat_arc_length = (np.sum(dy_[:,0])+np.sum(dy_[:,Ni//2]))/2
+    grid_lat_arc_length = np.sum(dy_[:,Ni//4])
+    grid_lon_arc_length = np.sum(dx_[0,:])
+    if(lat1>lat2):
+        grid_lon_arc_length = np.sum(dx_[-1,:])
+        
+    area_error = 100*(np.sum(area_)-exact_area)/exact_area
+    lat_arc_error = 100*(grid_lat_arc_length - exact_lat_arc_length)/exact_lat_arc_length
+    lon_arc_error = 100*(grid_lon_arc_length -  exact_lon_arc_length)/exact_lon_arc_length
+    print(exact_area)
+    print(np.sum(area_))
+    return lat_arc_error,lon_arc_error,area_error
 
 
 def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_changing_meta=None):
@@ -538,6 +557,8 @@ def main(argv):
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
             
+    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phi_s_Merc,phi_n_Merc))
+
     if(write_subgrid_files):
         write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source)
 
@@ -586,6 +607,8 @@ def main(argv):
         lamBP,phiBP = tripolar_n.x,tripolar_n.y
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
 
+    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+
     if(write_subgrid_files):
         write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source)
     ###
@@ -628,6 +651,7 @@ def main(argv):
         lamSO,phiSO = spherical.x,spherical.y
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
 
+    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,lat0_SO,lat0_SO+lenlat_SO))
     if(write_subgrid_files):
         write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source)
     ###
@@ -695,6 +719,7 @@ def main(argv):
             lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
+    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
     if(write_subgrid_files):
         write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source)
     #Concatenate to generate the whole grid
