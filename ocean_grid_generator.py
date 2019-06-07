@@ -63,7 +63,24 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     #or equivalently
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
     print('   number of js=',phis.shape[0])
-    return lams,phis
+
+    ##Calculate the Metrics
+    M_inv = rp * (1 + (np.tan(chic/2))**2) / (1 + (rp*np.tan(chic/2))**2)
+    chig = (90-phig)*PI_180
+    N     = rp * (1 + (np.tan(chig/2))**2) / (1 + (rp*np.tan(chig/2))**2)
+    N_inv = 1/N    
+    cos2phis = (np.cos(phis*PI_180))**2 
+
+    h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv)/(1+alpha2*beta2_inv)**2 \
+            +  M_inv*M_inv*(1-alpha2)/(1+alpha2*beta2_inv) 
+    h_j_inv = np.sqrt(h_j_inv)*N_inv*(90-lat0_bp)*PI_180/Nj_ncap
+#    h_j_inv = h_j_inv[:-1,:]
+
+    h_i_inv = cos2phis * (1+beta2_inv)/(1+alpha2*beta2_inv)**2 + M_inv*M_inv*alpha2*beta2_inv/(1+alpha2*beta2_inv)
+    h_i_inv = np.sqrt(h_i_inv)*(2*np.pi/Ni)
+#    h_i_inv = h_i_inv[:,:-1]
+
+    return lams,phis,h_i_inv,h_j_inv
 
 def bp_lam(x,y,bpeq,rp):
     """bp_lam = ((90-y)/(90-lat_join))*90
@@ -302,9 +319,7 @@ def metrics_error(dx_,dy_,area_,Ni,lat1,lat2=90,Re=_default_Re):
     exact_lat_arc_length = np.abs(lat2-lat1)*PI_180*Re  
     exact_lon_arc_length = np.cos(lat1*PI_180) *2*np.pi*Re
 
-#    if(lat2 == -90): #displaced pole?
-#        grid_lat_arc_length = (np.sum(dy_[:,0])+np.sum(dy_[:,Ni//2]))/2
-    grid_lat_arc_length = np.sum(dy_[:,Ni//4])
+    grid_lat_arc_length = np.sum(dy_[:,Ni//4]) 
     grid_lon_arc_length = np.sum(dx_[0,:])
     if(lat1>lat2):
         grid_lon_arc_length = np.sum(dx_[-1,:])
@@ -381,7 +396,15 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     
     print('   generated regular lat-lon grid between latitudes ', lphiSP[0,0],lphiSP[-1,0])
     print('   number of js=',lphiSP.shape[0])
-    return llamSP,lphiSP
+
+    h_i_inv=llen_lon*PI_180*np.cos(lphiSP*PI_180)/lni
+    h_j_inv=llen_lat*PI_180*np.ones(lphiSP.shape)/lnj
+    delsin_j = np.roll(np.sin(lphiSP*PI_180),shift=-1,axis=0) - np.sin(lphiSP*PI_180)
+    dx_h=h_i_inv[:,:-1]*_default_Re
+    dy_h=h_j_inv[:-1,:]*_default_Re
+    area=delsin_j[:-1,:-1]*_default_Re*_default_Re*llen_lon*PI_180/lni
+
+    return llamSP,lphiSP,dx_h,dy_h,area
 
 def usage():
     print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --reproduce_old8_grids --plot --write_subgrid_files]')
@@ -486,8 +509,7 @@ def main(argv):
     ###
     if(not reproduce_MIDAS_grids):
         lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
-        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
-        
+        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)        
     else: #use pymidas package   
         from pymidas.rectgrid_gen import supergrid
 
@@ -557,7 +579,7 @@ def main(argv):
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
             
-    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phi_s_Merc,phi_n_Merc))
+    print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
 
     if(write_subgrid_files):
         write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source)
@@ -583,10 +605,33 @@ def main(argv):
         if(reproduce_old8_grids):
             Nj_ncap=int(refineR* 120)
             lat0_bp=phi_n_Merc
-
-        lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
+        #Generate the bipolar grid
+        lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
+        #Metrics via MIDAS method
         dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
-        
+        print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+        #Metrics via h's 
+        dxBP_h=dxBP_h[:,:-1]
+        dyBP_h=dyBP_h[:-1,:]
+        arBP_h = dxBP_h[:-1,:]*dyBP_h[:,:-1]
+        print("   CHECK_h0: % errors in (lat arc, lon arc, area)", metrics_error(dxBP_h,dyBP_h,arBP_h,Ni,lat0_bp,90.,Re=1))
+        def quad_metrics(rf):
+            #Metrics via h's, finite element quadrature
+            lamBP_f,phiBP_f,dxBP_h_f,dyBP_h_f = generate_bipolar_cap_grid(Ni*rf,(Nj_ncap+1)*rf-1,lat0_bp,lon_bp,lenlon)
+            print(lamBP_f.shape,phiBP_f.shape)
+            print(dxBP_h_f.shape,dyBP_h_f.shape)
+            dxBP_h_f=dxBP_h_f[:,:-1]        
+            m,n=dxBP_h_f.shape
+            dxBP_h_c=dxBP_h_f.reshape(m//rf,rf,n//rf,rf).sum(axis=(1,3))/rf
+
+            dyBP_h_f=dyBP_h_f[:,:-1]
+            m,n=dyBP_h_f.shape
+            dyBP_h_c=dyBP_h_f.reshape(m//rf,rf,n//rf,rf).sum(axis=(1,3))/rf
+
+            arBP_h_f = dxBP_h_f[:,:]*dyBP_h_f[:,:]
+            arBP_h_c = arBP_h_f.reshape(m//rf,rf,n//rf,rf).sum(axis=(1,3))
+            print("   CHECK_hq: % errors in (lat arc, lon arc, area)", metrics_error(dxBP_h_c,dyBP_h_c,arBP_h_c,Ni,lat0_bp,90.,Re=1))
+        quad_metrics(10)
     else:
         if(refineR == 2):
             Nj_ncap = 119*refineS  
@@ -607,7 +652,6 @@ def main(argv):
         lamBP,phiBP = tripolar_n.x,tripolar_n.y
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
 
-    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
 
     if(write_subgrid_files):
         write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source)
@@ -627,8 +671,12 @@ def main(argv):
             lenlat_SO = phi_s_Merc-lat0_SO
             Nj_SO  =int(refineR*  55)
 
-        lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
+        lamSO,phiSO,dxhSO,dyhSO,arhSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
         dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
+        #Metrics errors via MIDAS
+        print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))
+        #Metrics errors via h's 
+        print("   CHECK_h: % errors in (lat arc, lon arc, area)", metrics_error(dxhSO,dyhSO,arhSO,Ni,phiSO[0,0],phiSO[-1,0]))
         
     else:
         if(refineR == 2):
@@ -651,7 +699,6 @@ def main(argv):
         lamSO,phiSO = spherical.x,spherical.y
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
 
-    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,lat0_SO,lat0_SO+lenlat_SO))
     if(write_subgrid_files):
         write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source)
     ###
@@ -673,8 +720,10 @@ def main(argv):
                 Nj_scap=int(refineR*  40)
                 lat0_SC=lat0_SO
 
-            lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
-            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
+            lamSC,phiSC,dxhSC,dyhSC,arhSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC, latlon_areafix=latlon_areafix)
+            #Metrics errors via h's 
+            print("   CHECK_h: % errors in (lat arc, lon arc, area)", metrics_error(dxhSC,dyhSC,arhSC,Ni,phiSC[-1,0],phiSC[0,0]))
         else:
             Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
@@ -719,7 +768,7 @@ def main(argv):
             lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
-    print("   CHECK: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
+    print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
     if(write_subgrid_files):
         write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source)
     #Concatenate to generate the whole grid
