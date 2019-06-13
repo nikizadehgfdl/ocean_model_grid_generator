@@ -336,23 +336,28 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
       metric=1.e3
     if  axis_units == 'degrees':                        
       metric=Re*PI_180
+    lv = ( 0.5 * ( y[:,1:] + y[:,:-1] ) ) * PI_180
+    dx_i = mdist( x[:,1:], x[:,:-1] ) * PI_180
+    dy_i = ( y[:,1:] - y[:,:-1] ) * PI_180
+    dx = Re * np.sqrt( dy_i**2 + (dx_i*np.cos(lv))**2 )
+    lu = ( 0.5 * ( y[1:,:] + y[:-1,:] ) ) * PI_180
+    dx_j = mdist( x[1:,:], x[:-1,:] ) * PI_180
+    dy_j = ( y[1:,:] - y[:-1,:] ) * PI_180
+    dy = Re * np.sqrt( dy_j**2 + (dx_j*np.cos(lu))**2 )
+
     ymid_j = 0.5*(y+np.roll(y,shift=-1,axis=0))
     ymid_i = 0.5*(y+np.roll(y,shift=-1,axis=1))      
     dy_j = np.roll(y,shift=-1,axis=0) - y
     dy_i = np.roll(y,shift=-1,axis=1) - y
     dx_i = mdist(np.roll(x,shift=-1,axis=1),x)
     dx_j = mdist(np.roll(x,shift=-1,axis=0),x)
-    dx = metric*metric*(dy_i*dy_i + dx_i*dx_i*np.cos(ymid_i*PI_180)*np.cos(ymid_i*PI_180))
-    dx = np.sqrt(dx)
-    dy = metric*metric*(dy_j*dy_j + dx_j*dx_j*np.cos(ymid_j*PI_180)*np.cos(ymid_j*PI_180))
-    dy = np.sqrt(dy)
-    dx=dx[:,:-1]
-    dy=dy[:-1,:]
     if(latlon_areafix):
-        delsin_j = np.roll(np.sin(y*PI_180),shift=-1,axis=0) - np.sin(y*PI_180)
-        area=metric*metric*dx_i[:-1,:-1]*delsin_j[:-1,:-1]/PI_180
+        sl = np.sin( lv )
+        dx_i = mdist( x[:,1:], x[:,:-1] ) * PI_180
+        area = (Re**2) * (
+            ( 0.5 * ( dx_i[1:,:] + dx_i[:-1,:] ) ) * ( sl[1:,:] - sl[:-1,:] ) )
     else:
-        area=dx[:-1,:]*dy[:,:-1]    
+        area = 0.25 * ( ( dx[1:,:] + dx[:-1,:] ) * ( dy[:,1:] + dy[:,:-1] ) )
     angle_dx=np.zeros((nytot,nxtot))
 #    angle_dx = np.arctan2(dy_i,dx_i)/PI_180      
 #    self.angle_dx = numpy.arctan2(dy_i,dx_i)*180.0/numpy.pi
