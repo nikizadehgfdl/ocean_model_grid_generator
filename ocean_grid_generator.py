@@ -326,10 +326,7 @@ def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=
 
 def mdist(x1,x2):
   """Returns positive distance modulo 360."""
-  a=np.mod(x1-x2+720.,360.)
-  b=np.mod(x2-x1+720.,360.)
-  d=np.minimum(a,b)
-  return d
+  return np.minimum( np.mod(x1-x2,360.), np.mod(x2-x1,360.) )
 
 def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafix=False):
     nytot,nxtot = x.shape
