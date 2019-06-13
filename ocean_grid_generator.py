@@ -14,9 +14,9 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     rp=np.tan(0.5*(90-lat0_bp)*PI_180)
     #First define a (lon,lat) coordinate on the Northern hemisphere of the globe sphere
     #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian 
-    lon_g = lon_bp  + np.arange(Ni+1) * lenlon/Ni 
+    lon_g = lon_bp  + np.arange(Ni+1) * lenlon/float(Ni)
     lamg = np.tile(lon_g,(Nj_ncap+1,1)) 
-    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/Nj_ncap
+    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/float(Nj_ncap)
     phig0_cap = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
     ### symmetry meridian resolution fix 
     phig = 90-2*np.arctan(np.tan(0.5*(90-phig0_cap)*PI_180)/rp)/PI_180
@@ -215,7 +215,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
         Nj = phi_M.shape[0]-1
                
     y_grid_M = np.tile(phi_M.reshape(Nj+1,1),(1,Ni+1))
-    lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/Ni
+    lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/float(Ni)
     x_grid_M = np.tile(lam_M,(Nj+1,1)) 
     print('   Final Mercator grid range=',y_grid_M[0,0],y_grid_M[-1,0])
     print('   number of js=',y_grid_M.shape[0])
@@ -225,7 +225,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
 def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SO,doughnut,nparts=8, ensure_nj_even=True):
     print( 'Generating displaced pole grid bounded at latitude ',lat0_SO  )
     print('   rdp=',r_dp,' , doughnut=',doughnut)
-    x=lon0 + np.arange(Ni+1) * lenlon/Ni
+    x=lon0 + np.arange(Ni+1) * lenlon/float(Ni)
     y=np.linspace(-90.,0.5*(lat0_SO-90.0),Nj_scap//nparts)
     y=np.concatenate((y,np.linspace(y.max(),lat0_SO,1+Nj_scap*(nparts-1)//nparts)))
     if(y.shape[0]%2 == 0 and ensure_nj_even):
@@ -421,8 +421,8 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
 
 def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=True):
     print('Generating regular lat-lon grid between latitudes ', llat0, llat0+llen_lat)
-    llonSP = llon0 + np.arange(lni+1) * llen_lon/lni
-    llatSP = llat0 + np.arange(lnj+1) * llen_lat/lnj
+    llonSP = llon0 + np.arange(lni+1) * llen_lon/float(lni)
+    llatSP = llat0 + np.arange(lnj+1) * llen_lat/float(lnj)
     if(llatSP.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
         llatSP = np.delete(llatSP,0,0)
@@ -740,7 +740,7 @@ def main(argv):
     else:
         doughnut=0.12
         nparts=8
-        Nj_scap = int((nparts/(nparts-1))*halfArc/deltaPhiSO)
+        Nj_scap = int((float(nparts)/float(nparts-1))*halfArc/deltaPhiSO)
         if(not reproduce_MIDAS_grids):
             if(reproduce_old8_grids):
                 Nj_scap=int(refineR*  40)
