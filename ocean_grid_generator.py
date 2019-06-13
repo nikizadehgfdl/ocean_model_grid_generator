@@ -375,7 +375,7 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
 
     if fnam is None:
       fnam='supergrid.nc'
-    fout=nc.Dataset(fnam,'w',format=format)
+    fout=nc.Dataset(fnam,'w',clobber=True,format=format)
 
     ny=area.shape[0]; nx = area.shape[1]
     nyp=ny+1; nxp=nx+1
@@ -393,12 +393,9 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     xv.units='degrees'
     yv[:]=y
     xv[:]=x
-#    tile[0:4]='tile1'
-    tile[0]='t'
-    tile[1]='i'
-    tile[2]='l'
-    tile[3]='e'
-    tile[4]='1'
+    stringvals = np.empty(1,'S'+repr(len(tile)))
+    stringvals[0] = 'tile1'
+    tile[:] = nc.stringtochar(stringvals)
     dyv=fout.createVariable('dy','f8',('ny','nxp'))
     dyv.units='meters'
     dyv[:]=dy
