@@ -28,7 +28,8 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     beta2_inv = (np.tan(phig*PI_180))**2
     
     A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|    
-    B=np.sqrt((1-alpha2)/(1+alpha2*beta2_inv)) #Actually two equations  +- |B|
+    rden = 1./(1.+alpha2*beta2_inv)
+    B=np.sqrt((1.-alpha2)*rden) #Actually two equations  +- |B|
 #   Equivalently we can do the following which has manifest symmetry lam --> 180+lam
 #    A=np.sin((lamg-lon_bp)*PI_180)*np.sin(phig*PI_180) #Actually two equations  +- |A|
 #    A=np.where((lamg-lon_bp)>180,-A,A)
