@@ -2,8 +2,6 @@ TARGS = ocean_hgrid_res4.0.nc \
         ocean_hgrid_res1.0.nc \
         ocean_hgrid_res0.5.nc \
         ocean_hgrid_res0.5_equenh.nc \
-        ocean_hgrid_res0.5_MIDAS.nc \
-	ocean_hgrid_res0.25_MIDAS.nc \
 	ocean_hgrid_res0.25.nc \
 	ocean_hgrid_res0.125.nc \
 	ocean_hgrid_res0.125_old.nc
