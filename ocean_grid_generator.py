@@ -251,7 +251,7 @@ def displaced_pole_cap(lon_grid,lat_grid,lam_pole,r_pole,lat_joint,excluded_frac
 
     #Find the theta that has matching resolution at the unit circle with longitude at the joint
     #This is a conformal transformation the unit circle (inverse to the one below)
-    e2itheta = np.exp(1j*lon_grid*PI_180) 
+    e2itheta = np.cos(lon_grid*PI_180) + 1j * np.sin(lon_grid*PI_180)
     e2ithetaprime = (e2itheta + z_0)/(1. + np.conj(z_0)*e2itheta)
 
     #Conformal map to displace pole from r=0 to r=r_dispole
