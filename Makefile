@@ -1,6 +1,7 @@
 TARGS = ocean_hgrid_res4.0.nc \
         ocean_hgrid_res1.0.nc \
         ocean_hgrid_res0.5.nc \
+        ocean_hgrid_res0.5_equenh.nc \
         ocean_hgrid_res0.5_MIDAS.nc \
 	ocean_hgrid_res0.25_MIDAS.nc \
 	ocean_hgrid_res0.25.nc \
@@ -32,6 +33,8 @@ ocean_hgrid_res0.125.nc:
 ocean_hgrid_res0.125_old.nc:
 	#module swap python/3.6.4 On gfdl pan
 	./ocean_grid_generator.py -f ocean_hgrid_res0.125_old.nc -r 8 --reproduce_old8_grids --no_changing_meta
+ocean_hgrid_res0.5_equenh.nc: 
+	./ocean_grid_generator.py -f ocean_hgrid_res0.5_equenh.nc -r 2 --rdp 0 --south_cutoff_row 128 --no_changing_meta --write_subgrid_files --enhanced_equatorial
 
 hash.md5: | $(TARGS)
 	md5sum $(TARGS) > $@
@@ -41,4 +44,4 @@ check:
 	md5sum -c hash.md5
 
 clean:
-	rm -f $(TARGS) $(DEPS) pickle.*        
+	rm -f $(TARGS) $(DEPS) ocean_hgrid_res*.nc        

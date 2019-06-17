@@ -115,7 +115,19 @@ def generate_bipolar_cap_grid_fms(Ni,Nj_ncap,lat0_p,lon_p,lenlon,lenlat):
     print('   number of js=',phis_fms.shape[0])
     return lams_fms, phis_fms
 
-
+def lagrange_interp(x,y,q):
+    """Lagrange polynomial interpolation. Retruns f(q) which f(x) passes through four data
+       points at x[0..3], y[0..3]."""
+    # n - numerator, d - denominator
+    n0 = ( q - x[1] ) * ( q - x[2] ) * ( q - x[3] )
+    d0 = ( x[0] - x[1] ) * ( x[0] - x[2] ) * ( x[0] - x[3] )
+    n1 = ( q - x[0] ) * ( q - x[2] ) * ( q - x[3] )
+    d1 = ( x[1] - x[0] ) * ( x[1] - x[2] ) * ( x[1] - x[3] )
+    n2 = ( q - x[0] ) * ( q - x[1] ) * ( q - x[3] )
+    d2 = ( x[2] - x[0] ) * ( x[2] - x[1] ) * ( x[2] - x[3] )
+    n3 = ( q - x[0] ) * ( q - x[1] ) * ( q - x[2] )
+    d3 = ( x[3] - x[0] ) * ( x[3] - x[1] ) * ( x[3] - x[2] )
+    return ( (n0/d0)*y[0] + (n3/d3)*y[3] ) + ( (n1/d1)*y[1] + (n2/d2)*y[2] )
 
 def y_mercator(Ni, phi):
     """Equation (1)"""
@@ -129,7 +141,7 @@ def y_mercator_rounded(Ni, phi):
     y_float = y_mercator(Ni, phi)
     return ( np.sign(y_float) * np.ceil( np.abs(y_float) ) ).astype(int)
 
-def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_point=True, ensure_nj_even=True):
+def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_to_u_point=True, ensure_nj_even=True,enhanced_equatorial=False):
     print( 'Requesting Mercator grid with phi range: phi_s,phi_n=', phi_s,phi_n )
     # Diagnose nearest integer y(phi range)
     y_star = y_mercator_rounded(Ni, np.array([phi_s*PI_180,phi_n*PI_180]))
@@ -141,16 +153,17 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_poi
             print("   Fixing this by shifting the bounds!")
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
-            print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
+            #print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
     if((y_star[1]-y_star[0]+1)%2 == 0 and ensure_nj_even):
         print("   Supergrid has an odd number of area cells!")
         if(ensure_nj_even):
             print("   Fixing this by shifting the y_star[1] ")
             y_star[1] = y_star[1] - 1
-            print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
+            #print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
     Nj=y_star[1]-y_star[0]
     print( '   Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
     phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
+
     #Ensure that the equator (y=0) is included and is a u-point
     equator=0.0
     equator_index = np.searchsorted(phi_M,equator)
@@ -162,9 +175,66 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,shift_equator_to_u_poi
     if(equator_index%2 == 0):
         raise Exception("Ooops: Equator is not going to be a u-point")
 
+    if(enhanced_equatorial):
+        print ('   Enhancing the equator region resolution')
+        #Enhance the lattitude resolution between 30S and 30N 
+        #Set a constant high res lattitude grid spanning 10 degrees centered at the Equator. 
+        #This construction makes the whole Mercator subgrid symmetric around the Equator.
+        #
+        #Free MIDAS parameters. Where does this come from and how should it change with resolution?
+        phi_enh_d =-5. #Starting lattitude of enhanced resolution grid 
+        phi_cub_d =-30 #Starting lattitude of cubic interpolation 
+
+        N_cub=132   *refineR/2 #Number of points in the cubic interpolation for one shoulder
+                               #MIDAS has 130, but 132 produces a result closer to 1/2 degree MIDAS grid
+        dphi_e=0.13 *2/refineR #Enhanced resolution 10 degrees around the equator
+        N_enh=40    *refineR/2 #Number of points in the enhanced resolution below equator
+
+        j_c0d = np.where(phi_M<phi_enh_d)[0][-1] #The last index with phi_M<phi_enh_d
+        j_phi_cub_d = np.where(phi_M<phi_cub_d)[0][-1]  #The last index with phi_M<phi_cub_d
+        dphi = phi_M[1:]-phi_M[0:-1]
+
+        cubic_lagrange_interp = True
+        cubic_scipy = False 
+
+        phi1 = phi_M[0:j_phi_cub_d]
+        phi_s = phi_M[j_phi_cub_d-1]
+        dphi_s = phi_M[j_phi_cub_d]-phi_M[j_phi_cub_d-1]
+        phi_e = phi_enh_d
+
+        nodes = [0,1,N_cub-2,N_cub-1]
+        phi_nodes = [phi_s,phi_s+dphi_s,phi_e-dphi_e,phi_e]
+        q=np.arange(N_cub)
+        
+        if(cubic_lagrange_interp):
+            phi2 = lagrange_interp(nodes,phi_nodes,q)
+        elif(cubic_scipy): #MIDAS 
+            import scipy.interpolate
+            f2=scipy.interpolate.interp1d(nodes,phi_nodes,kind='cubic')
+            jInd2=np.arange(N_cub, dtype=float)
+            phi2=f2(jInd2)
+
+        print("   Meridional range of pure Mercator=(", phi1[0],",", phi1[-2],") U (", -phi1[-2],",", -phi1[0],")." )
+        print("   Meridional range of cubic interpolation=(", phi2[0],"," , phi2[-2],") U (",-phi2[-2],",",-phi2[0],")." )
+        phi3=np.concatenate((phi1[0:-1],phi2))
+
+        phi_s = phi3[-1]
+        phi4=np.linspace(phi_s,0,N_enh)
+        print("   Meridional range of enhanced resolution=(", phi4[0],",", -phi4[0],").")
+        print("   Meridional value of enhanced resolution=", phi4[1]-phi4[0])
+        phi5=np.concatenate((phi3[0:-1],phi4))
+        #Make the grid symmetric around the equator!!!!
+        phi_M = np.concatenate((phi5[0:-1],-phi5[::-1]))
+
+        #limit the upper lattitude by the requested phi_n
+        j_phi_n = np.where(phi_M<phi_n)[0][-1]  #The last index with phi_M<phi_n
+        phi_M = phi_M[0:j_phi_n]
+        Nj = phi_M.shape[0]-1
+               
     y_grid_M = np.tile(phi_M.reshape(Nj+1,1),(1,Ni+1))
     lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/Ni
     x_grid_M = np.tile(lam_M,(Nj+1,1)) 
+    print('   Final Mercator grid range=',y_grid_M[0,0],y_grid_M[-1,0])
     print('   number of js=',y_grid_M.shape[0])
     return x_grid_M,y_grid_M
 
@@ -407,7 +477,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP,dx_h,dy_h,area
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --reproduce_old8_grids --plot --write_subgrid_files]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --reproduce_old8_grids --plot --write_subgrid_files --enhanced_equatorial]')
  
 
 def main(argv):
@@ -425,9 +495,10 @@ def main(argv):
     write_subgrid_files = False
     plotem = False
     no_changing_meta = False
+    enhanced_equatorial = False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files","no_changing_meta"])
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -457,6 +528,8 @@ def main(argv):
              write_subgrid_files = True
         elif opt in ("--no_changing_meta"):
              no_changing_meta = True
+        elif opt in ("--enhanced_equatorial"):
+             enhanced_equatorial = True
         else:
             assert False, "unhandled option"
 
@@ -503,13 +576,14 @@ def main(argv):
     #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
+#    phi_s_Merc, phi_n_Merc = -68.0, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
 
     ###
     ###Mercator grid
     ###
     if(not reproduce_MIDAS_grids):
-        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, ensure_nj_even=ensure_nj_even)    
-        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)        
+        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)    
+        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
     else: #use pymidas package   
         from pymidas.rectgrid_gen import supergrid
 
@@ -833,10 +907,16 @@ def main(argv):
     if(south_cutoff_row > 0):
         desc = desc + " The first "+ str(south_cutoff_row) +" rows at south are deleted."
     
-
-#    print(hist)
-#    print(desc)
-#    print(source)
+    #Ensure that the equator (y=0) is still a u-point
+    equator=0.0
+    equator_index = np.searchsorted(y3[:,Ni//4],equator)
+    if(equator_index == 0): 
+        raise Exception('   Ooops: Equator is not in the grid')
+    else:
+        print("   Equator is at j=", equator_index)
+    #Ensure that the equator (y=0) is a u-point
+    if(equator_index%2 == 0):
+        raise Exception("Ooops: Equator is not going to be a u-point. Use option --south_cutoff_row to one more or on less row from south.")
 
     write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta)
     print("Wrote the whole grid to file ",gridfilename)
