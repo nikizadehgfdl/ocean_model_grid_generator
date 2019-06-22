@@ -24,7 +24,7 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
     A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|    
     B=np.sqrt((1-alpha2)/(1+alpha2*beta2_inv)) #Actually two equations  +- |B|
     #Deal with beta=0
-    B=np.where(np.abs(beta2_inv)>1.0E10 , 0.0, B)
+    B=np.where(np.abs(beta2_inv)>1.0E20 , 0.0, B)
     
     lamc = np.arcsin(B)/PI_180
     chic = np.arccos(A)
@@ -53,12 +53,12 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
     h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv)/(1+alpha2*beta2_inv)**2 \
             +  M_inv*M_inv*(1-alpha2)/(1+alpha2*beta2_inv) 
     #Deal with beta=0. Prove that cos2phis/alpha2 ---> 0 when alpha, beta  ---> 0
-    h_j_inv=np.where(np.abs(beta2_inv)>1.0E10 , M_inv*M_inv, h_j_inv)        
+    h_j_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_j_inv)        
     h_j_inv = np.sqrt(h_j_inv)*N_inv 
 
     h_i_inv = cos2phis * (1+beta2_inv)/(1+alpha2*beta2_inv)**2 + M_inv*M_inv*alpha2*beta2_inv/(1+alpha2*beta2_inv)
     #Deal with beta=0
-    h_i_inv=np.where(np.abs(beta2_inv)>1.0E10 , M_inv*M_inv, h_i_inv)    
+    h_i_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_i_inv)    
     h_i_inv = np.sqrt(h_i_inv) 
     return lams,phis,h_i_inv,h_j_inv
 
