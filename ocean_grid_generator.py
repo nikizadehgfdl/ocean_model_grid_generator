@@ -11,6 +11,15 @@ PI_180 = np.pi/180.
 #_default_Re = 6.378e6
 _default_Re = 6371.e3 #MIDAS
 
+def chksum(x, lbl):
+    import hashlib
+    y = np.zeros( x.shape )
+    y[:] = x
+    ymin, ymax, ymean = y.min(), y.max(), y.mean()
+    ysd = np.sqrt( ((y - ymean)**2).mean() )
+    print(hashlib.sha256(y).hexdigest(), '%10s'%lbl, 'min = %.15f'%ymin, 'max = %.15f'%ymax,
+          'mean = %.15f'%ymean, 'sd = %.15f'%ysd)
+
 def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
     rp=np.tan(0.5*(90-lat0_bp)*PI_180)
@@ -373,12 +382,20 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
     return dx,dy,area,angle_dx
 
 
-def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_changing_meta=None):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_changing_meta=None,debug=False):
     import netCDF4 as nc
 
     if fnam is None:
       fnam='supergrid.nc'
     fout=nc.Dataset(fnam,'w',clobber=True,format=format)
+
+    if debug:
+        chksum(x,'x')
+        chksum(y,'y')
+        chksum(dx,'dx')
+        chksum(dy,'dy')
+        chksum(area,'area')
+        chksum(angle_dx,'angle_dx')
 
     ny=area.shape[0]; nx = area.shape[1]
     nyp=ny+1; nxp=nx+1
@@ -456,9 +473,10 @@ def main(argv):
     plotem = False
     no_changing_meta = False
     enhanced_equatorial = False
+    debug = False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial"])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","reproduce_old8_grids","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -472,6 +490,8 @@ def main(argv):
             gridfilename = arg
         elif opt in ("-r", "--inverse_resolution"):
             degree_resolution_inverse = float(arg)
+        elif opt in ("-d"):
+            debug = True
         elif opt in ("--south_cutoff_ang"):
             south_cutoff_ang = float(arg)
         elif opt in ("--south_cutoff_row"):
@@ -615,7 +635,7 @@ def main(argv):
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
             
     if(write_subgrid_files):
-        write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source)
+        write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source,debug=debug)
 
     #The phi resolution in the first and last row of Mercator grid along the symmetry meridian
     DeltaPhiMerc_so = phiMerc[ 1,Ni//4]-phiMerc[ 0,Ni//4]
@@ -663,7 +683,7 @@ def main(argv):
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
 
     if(write_subgrid_files):
-        write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source)
+        write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source,debug=debug)
     ###
     ###Southern Ocean grid
     ###
@@ -705,7 +725,7 @@ def main(argv):
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
 
     if(write_subgrid_files):
-        write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source)
+        write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source,debug=debug)
     ###
     ###Southern cap
     ###
@@ -772,7 +792,7 @@ def main(argv):
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
     if(write_subgrid_files):
-        write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source)
+        write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
     #Concatenate to generate the whole grid
     #Start from displaced southern cap and join the southern ocean grid
     print("Stitching the grids together...")
@@ -846,7 +866,7 @@ def main(argv):
     if(equator_index%2 == 0):
         raise Exception("Ooops: Equator is not going to be a u-point. Use option --south_cutoff_row to one more or on less row from south.")
 
-    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta)
+    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
     print("Wrote the whole grid to file ",gridfilename)
     
     #Visualization
