@@ -13,8 +13,10 @@ _default_Re = 6371.e3 #MIDAS
 
 def chksum(x, lbl):
     import hashlib
-    y = np.zeros( x.shape )
-    y[:] = x
+    if type(x) in (float,int, np.float64): y = np.array( x )
+    else:
+        y = np.zeros( x.shape )
+        y[:] = x
     ymin, ymax, ymean = y.min(), y.max(), y.mean()
     ysd = np.sqrt( ((y - ymean)**2).mean() )
     print(hashlib.sha256(y).hexdigest(), '%10s'%lbl, 'min = %.15f'%ymin, 'max = %.15f'%ymax,
@@ -55,20 +57,23 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
     ##then we have tan(\phi_s'/2)=tan(\phi_p'/2)tan(\phi_c'/2)
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
     ##Calculate the Metrics
-    M_inv = rp * (1 + (np.tan(chic/2))**2) / (1 + (rp*np.tan(chic/2))**2)
+    rden = 1. / (1 + (rp*np.tan(chic/2))**2)
+    M_inv = rp * (1 + (np.tan(chic/2))**2) * rden
     M = 1/M_inv
     chig = (90-phig)*PI_180
-    N     = rp * (1 + (np.tan(chig/2))**2) / (1 + (rp*np.tan(chig/2))**2)
+    rden = 1. / (1 + (rp*np.tan(chig/2))**2)
+    N     = rp * (1 + (np.tan(chig/2))**2) * rden
     N_inv = 1/N    
     cos2phis = (np.cos(phis*PI_180))**2 
 
-    h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv)/(1+alpha2*beta2_inv)**2 \
-            +  M_inv*M_inv*(1-alpha2)/(1+alpha2*beta2_inv) 
+    rden = 1. / (1+alpha2*beta2_inv)
+    h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv) * (rden**2) \
+            +  M_inv*M_inv*(1-alpha2) * rden
     #Deal with beta=0. Prove that cos2phis/alpha2 ---> 0 when alpha, beta  ---> 0
     h_j_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_j_inv)        
     h_j_inv = np.sqrt(h_j_inv)*N_inv 
 
-    h_i_inv = cos2phis * (1+beta2_inv)/(1+alpha2*beta2_inv)**2 + M_inv*M_inv*alpha2*beta2_inv/(1+alpha2*beta2_inv)
+    h_i_inv = cos2phis * (1+beta2_inv) * (rden**2) + M_inv*M_inv*alpha2*beta2_inv * rden
     #Deal with beta=0
     h_i_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_i_inv)    
     h_i_inv = np.sqrt(h_i_inv) 
@@ -84,25 +89,25 @@ def generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=True):
             print("   The number of j's is not even. Fixing this by cutting one row.")
             Nj_ncap =  Nj_ncap - 1
 
-    lon_g = lon_bp  + np.arange(Ni+1) *  360./Ni
+    lon_g = lon_bp  + np.arange(Ni+1) *  360./float(Ni)
     lamg = np.tile(lon_g,(Nj_ncap+1,1)) 
-    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/Nj_ncap
+    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/float(Nj_ncap)
     phig = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
     rp=np.tan(0.5*(90-lat0_bp)*PI_180)
     lams,phis,h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp)
-    h_i_inv = h_i_inv[:,:-1] * 2*np.pi/Ni
-    h_j_inv = h_j_inv[:-1,:] * PI_180*(90-lat0_bp)/Nj_ncap
+    h_i_inv = h_i_inv[:,:-1] * 2*np.pi/float(Ni)
+    h_j_inv = h_j_inv[:-1,:] * PI_180*(90-lat0_bp)/float(Nj_ncap)
     print('   number of js=',phis.shape[0])
     return lams,phis,h_i_inv,h_j_inv
 
 def bipolar_cap_ij_array(i,j,Ni,Nj_ncap,lat0_bp,lon_bp,rp):
-    long = lon_bp  + i * 360./Ni 
-    latg = lat0_bp + j * (90-lat0_bp)/Nj_ncap
+    long = lon_bp  + i * 360./float(Ni)
+    latg = lat0_bp + j * (90-lat0_bp)/float(Nj_ncap)
     lamg = np.tile(long,(latg.shape[0],1)) 
     phig = np.tile(latg.reshape((latg.shape[0],1)),(1,long.shape[0]))
     lams,phis,h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp)
-    h_i_inv = h_i_inv * 2*np.pi/Ni
-    h_j_inv = h_j_inv * (90-lat0_bp)*PI_180/Nj_ncap
+    h_i_inv = h_i_inv * 2*np.pi/float(Ni)
+    h_j_inv = h_j_inv * (90-lat0_bp)*PI_180/float(Nj_ncap)
     return lams,phis,h_i_inv,h_j_inv
 
 def bipolar_cap_metrics_quad(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
@@ -809,7 +814,7 @@ def main(argv):
         lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp)
         #Metrics via MIDAS method
         dxBP,dyBP,areaBP,angleBP = generate_grid_metrics_MIDAS(lamBP,phiBP)
-        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+        #print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
         #Metrics via quadratue of h's 
         rp=np.tan(0.5*(90-lat0_bp)*PI_180)
         dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
