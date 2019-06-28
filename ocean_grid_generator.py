@@ -666,15 +666,16 @@ def main(argv):
 
 
     #Information to write in file as metadata
-    import socket
-    host = str(socket.gethostname())
-    scriptpath = sys.argv[0]
-    scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
-    scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
-    scriptgithash = subprocess.check_output("cd "+scriptdirname +";git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
-    scriptgitMod  = subprocess.check_output("cd "+scriptdirname +";git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
-    if("M" in str(scriptgitMod)):
-        scriptgitMod = " , But was localy Modified!"
+    if(not no_changing_meta):
+        import socket
+        host = str(socket.gethostname())
+        scriptpath = sys.argv[0]
+        scriptbasename = subprocess.check_output("basename "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
+        scriptdirname = subprocess.check_output("dirname "+ scriptpath,shell=True).decode('ascii').rstrip("\n")
+        scriptgithash = subprocess.check_output("cd "+scriptdirname +";git rev-parse HEAD; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+        scriptgitMod  = subprocess.check_output("cd "+scriptdirname +";git status --porcelain "+scriptbasename+" | awk '{print $1}' ; exit 0",stderr=subprocess.STDOUT,shell=True).decode('ascii').rstrip("\n")
+        if("M" in str(scriptgitMod)):
+            scriptgitMod = " , But was localy Modified!"
 
     hist = "This grid file was generated via command " + ' '.join(sys.argv)
     if(not no_changing_meta):
