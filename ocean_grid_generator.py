@@ -154,7 +154,14 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
         i_s = b*i + a*(i+1)
         i1d = np.append(i1d,i_s)
 
-    lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
+    nj,ni = j1d.shape[0],i1d.shape[0] # Shape of results
+    dj = min(nj, max(32*1024//ni,1)) # Stride to use that fits in memory
+    lams,phis,dx,dy = np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni))
+    for j in range(0,nj,dj):
+        je = min(nj,j+dj)
+        lams[j:je],phis[j:je],dx[j:je],dy[j:je] = bipolar_cap_ij_array(i1d,j1d[j:je],nx,ny,lat0_bp,lon_bp,rp)
+
+   #lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
     #reshape to send for quad averaging
     dx_r = dx.reshape(ny,order,nx,order)
     dy_r = dy.reshape(ny,order,nx,order)
