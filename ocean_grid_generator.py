@@ -20,42 +20,26 @@ def chksum(x, lbl):
     print(hashlib.sha256(y).hexdigest(), '%10s'%lbl, 'min = %.15f'%ymin, 'max = %.15f'%ymax,
           'mean = %.15f'%ymean, 'sd = %.15f'%ysd)
 
-def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
-    print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
-    rp=np.tan(0.5*(90-lat0_bp)*PI_180)
-    #First define a (lon,lat) coordinate on the Northern hemisphere of the globe sphere
-    #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian 
-    lon_g = lon_bp  + np.arange(Ni+1) * lenlon/float(Ni)
-    lamg = np.tile(lon_g,(Nj_ncap+1,1)) 
-    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/float(Nj_ncap)
-    phig0_cap = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
+def bipolar_projection(lamg,phig,lon_bp,rp):
+    """Makes a stereographic bipolar projection of the input coordinate mesh (lamg,phig)  
+       Returns the projected coordinate mesh and their metric coefficients (h^-1).
+       The input mesh must be a regular spherical grid capping the pole with:
+           latitudes between 2*arctan(rp) and 90  degrees
+           longitude between lon_bp       and lonp+360   
+       """
     ### symmetry meridian resolution fix 
-    phig = 90-2*np.arctan(np.tan(0.5*(90-phig0_cap)*PI_180)/rp)/PI_180
-
+    phig = 90-2*np.arctan(np.tan(0.5*(90-phig)*PI_180)/rp)/PI_180
     #Simplify  the formulas to avoid division by zero
-    #alpha  = np.cos((lamg-lon_p)*PI_180) 
     alpha2 = (np.cos((lamg-lon_bp)*PI_180))**2
-    #beta = -np.cotan(phig*PI_180)
     beta2_inv = (np.tan(phig*PI_180))**2
-    
     A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|    
     rden = 1./(1.+alpha2*beta2_inv)
     B=np.sqrt((1.-alpha2)*rden) #Actually two equations  +- |B|
-#   Equivalently we can do the following which has manifest symmetry lam --> 180+lam
-#    A=np.sin((lamg-lon_bp)*PI_180)*np.sin(phig*PI_180) #Actually two equations  +- |A|
-#    A=np.where((lamg-lon_bp)>180,-A,A)
-#    
-#    B=np.sin((lamg-lon_bp)*PI_180)/np.sqrt(1+alpha2*beta2_inv) #Actually two equations  +- |B|
-#    B=np.where((lamg-lon_bp)>180,-B,B)
-
     #Deal with beta=0
-    B=np.where(np.abs(beta2_inv)>1.0E10 , 0.0, B)
-
-    lamc = np.arcsin(B)/PI_180 
-    #phic = np.arcsin(A)/PI_180
-    #or use
+    B=np.where(np.abs(beta2_inv)>1.0E20 , 0.0, B)
+    
+    lamc = np.arcsin(B)/PI_180
     chic = np.arccos(A)
-
     ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
     ##We have to pickup the "correct" root. 
     ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
@@ -67,48 +51,185 @@ def generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon):
     lamc = np.where((lamg-lon_bp==90),90,lamc)    #Along symmetry meridian choose lamc=90-lon_bp
     lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp    
     lams = lamc + lon_bp
-
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
     ##then we have tan(\phi_s'/2)=tan(\phi_p'/2)tan(\phi_c'/2)
-
-    #phis = 90 - 2 * np.arctan(rp * np.tan(0.5*(90-phic)*PI_180))/PI_180
-    #or equivalently
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
+    ##Calculate the Metrics
+    M_inv = rp * (1 + (np.tan(chic/2))**2) / (1 + (rp*np.tan(chic/2))**2)
+    M = 1/M_inv
+    chig = (90-phig)*PI_180
+    N     = rp * (1 + (np.tan(chig/2))**2) / (1 + (rp*np.tan(chig/2))**2)
+    N_inv = 1/N    
+    cos2phis = (np.cos(phis*PI_180))**2 
+
+    h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv)/(1+alpha2*beta2_inv)**2 \
+            +  M_inv*M_inv*(1-alpha2)/(1+alpha2*beta2_inv) 
+    #Deal with beta=0. Prove that cos2phis/alpha2 ---> 0 when alpha, beta  ---> 0
+    h_j_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_j_inv)        
+    h_j_inv = np.sqrt(h_j_inv)*N_inv 
+
+    h_i_inv = cos2phis * (1+beta2_inv)/(1+alpha2*beta2_inv)**2 + M_inv*M_inv*alpha2*beta2_inv/(1+alpha2*beta2_inv)
+    #Deal with beta=0
+    h_i_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_i_inv)    
+    h_i_inv = np.sqrt(h_i_inv) 
+    return lams,phis,h_i_inv,h_j_inv
+
+def generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=True):
+    #Define a (lon,lat) coordinate mesh on the Northern hemisphere of the globe sphere
+    #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian 
+    print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
+    if(Nj_ncap%2 != 0 and ensure_nj_even):
+        print("   Supergrid has an odd number of area cells!")
+        if(ensure_nj_even):
+            print("   The number of j's is not even. Fixing this by cutting one row.")
+            Nj_ncap =  Nj_ncap - 1
+
+    lon_g = lon_bp  + np.arange(Ni+1) *  360./Ni
+    lamg = np.tile(lon_g,(Nj_ncap+1,1)) 
+    latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/Nj_ncap
+    phig = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
+    rp=np.tan(0.5*(90-lat0_bp)*PI_180)
+    lams,phis,h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp)
+    h_i_inv = h_i_inv[:,:-1] * 2*np.pi/Ni
+    h_j_inv = h_j_inv[:-1,:] * PI_180*(90-lat0_bp)/Nj_ncap
     print('   number of js=',phis.shape[0])
-    return lams,phis
+    return lams,phis,h_i_inv,h_j_inv
 
-def bp_lam(x,y,bpeq,rp):
-    """bp_lam = ((90-y)/(90-lat_join))*90
-       invert Murray's eqn. 5b with phic=0 to place point at specified geo. lat """
-    bp_lam = 2.*np.arctan(np.tan((0.5*np.pi-y*PI_180)/2)/rp)/PI_180
-    bp_lam = np.where(mdist(x,bpeq)<90.,-bp_lam, bp_lam)
-    return bp_lam    
+def bipolar_cap_ij_array(i,j,Ni,Nj_ncap,lat0_bp,lon_bp,rp):
+    long = lon_bp  + i * 360./Ni 
+    latg = lat0_bp + j * (90-lat0_bp)/Nj_ncap
+    lamg = np.tile(long,(latg.shape[0],1)) 
+    phig = np.tile(latg.reshape((latg.shape[0],1)),(1,long.shape[0]))
+    lams,phis,h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp)
+    h_i_inv = h_i_inv * 2*np.pi/Ni
+    h_j_inv = h_j_inv * (90-lat0_bp)*PI_180/Nj_ncap
+    return lams,phis,h_i_inv,h_j_inv
 
-def bp_phi(x,y,bpsp,bpnp):
-    bps = mdist(x,bpsp)
-    bpn = mdist(x,bpnp)
-    bp_phi = np.where(bps<90,-90+bps,90-bpn)
-    return bp_phi
+def bipolar_cap_metrics_quad(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
+    a,b = quad_positions(order)
+    daq = np.zeros([ny+1,nx+1])
+    dxq = np.zeros([ny+1,nx+1])
+    dyq = np.zeros([ny+1,nx+1])
+    
+    for j in range(0,ny+1):  
+        j_s = b*j + a*(j+1)
+        if(j_s[-1]==ny): j_s[-1]=ny-0.001 #avoid phi=90 as this will cause errore. 
+                                          #Niki:Find a way to avoid this properly. 
+                                          #This could be a sign that there is still something  
+                                          #wrong with the h_j_inv calculations at phi=90 (beta=0).
+        for i in range(0,nx+1):
+            i_s = b*i + a*(i+1)
+            lamsij,phisij,dxij,dyij =  bipolar_cap_ij_array(i_s,j_s,nx,ny,lat0_bp,lon_bp,rp)
+            dxdyij = dxij*dyij
+            daq[j,i] = quad_average_2d(dxdyij)
+            dxq[j,i] = quad_average(dxij[0,:])
+            dyq[j,i] = quad_average(dyij[:,0])
+    daq = daq[:-1,:-1]*Re*Re   
+    dxq = dxq[:,:-1]  *Re
+    dyq = dyq[:-1,:]  *Re
+    return dxq,dyq,daq       
 
-def generate_bipolar_cap_grid_fms(Ni,Nj_ncap,lat0_p,lon_p,lenlon,lenlat):
-    print( 'Generating FMS bipolar grid bounded at latitude ',lat0_p  )
-    rp=np.tan(0.5*(90-lat0_p)*PI_180) #Murray section 2.2 before Eq(6) r_p=tan(\phi_P\prime /2) 
-                                                   #where \phi_P is the latitude of the bounding parrallel lat0
-    sp_lon_cap = lon_p  + np.arange(Ni+1) * lenlon/Ni 
-    sp_lat_cap = lat0_p + np.arange(Nj_ncap+1) * lenlat/Nj_ncap
-    lon_cap = np.tile(sp_lon_cap,(Nj_ncap+1,1)) 
-    lat_cap = np.tile(sp_lat_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
+def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
+    a,b = quad_positions(order)
+    daq = np.zeros([ny+1,nx+1])
+    dxq = np.zeros([ny+1,nx+1])
+    dyq = np.zeros([ny+1,nx+1])
+    
+    j1d = np.empty([0])
+    for j in range(0,ny):  
+        j_s = b*j + a*(j+1)
+        if(j_s[-1]==ny): j_s[-1]=ny-0.001 #avoid phi=90 as this will cause errore. 
+                                          #Niki:Find a way to avoid this properly. 
+                                          #This could be a sign that there is still something  
+                                          #wrong with the h_j_inv calculations at phi=90 (beta=0).
+        j1d = np.append(j1d,j_s)
 
-    lamc_fms = bp_lam(lon_cap,lat_cap,lon_p+90,rp) 
-    phic_fms = bp_phi(lon_cap,lat_cap,lon_p,lon_p+180)
-    lams_fms = lon_p + 90*0 - np.arctan2(np.sin(lamc_fms*PI_180),np.tan(phic_fms*PI_180))/PI_180 #eqn.5a
-    #Note the *0:          |
-    #The original grid is rotated 90 degrees compared to both MIDAS and new
+    i1d = np.empty([0])
+    for i in range(0,nx):  
+        i_s = b*i + a*(i+1)
+        i1d = np.append(i1d,i_s)
 
-    chic_fms = np.arccos(np.cos(lamc_fms*PI_180)*np.cos(phic_fms*PI_180)) #eqn.6
-    phis_fms = 90 - 2 * np.arctan(rp*np.tan(chic_fms/2))/PI_180
-    print('   number of js=',phis_fms.shape[0])
-    return lams_fms, phis_fms
+    lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
+    #reshape to send for quad averaging
+    dx_r = dx.reshape(ny,order,nx,order)
+    dy_r = dy.reshape(ny,order,nx,order)
+    #area element
+    dxdy_r = dx_r*dy_r
+
+    for j in range(0,ny):  
+        for i in range(0,nx):
+            daq[j,i] = quad_average_2d(dxdy_r[j,:,i,:])
+            dxq[j,i] = quad_average(dx_r[j,0,i,:])
+            dyq[j,i] = quad_average(dy_r[j,:,i,0])
+    daq = daq[:-1,:-1]*Re*Re   
+    dxq = dxq[:,:-1]  *Re
+    dyq = dyq[:-1,:]  *Re
+    return dxq,dyq,daq       
+
+def quad_positions(n=3):
+    """Returns weights wa and wb so that the element [xa,xb] is sampled at positions
+    x=wa(xa+xb*xb)."""
+    if n==2:
+        return np.array([0.,1.]),np.array([1.,0.])
+    if n==3:
+        return np.array([0.,0.5,1.]),np.array([1.,0.5,0.])
+    if n==4:
+        r5 = 0.5 / np.sqrt(5.)
+        return np.array([0.,0.5-r5,0.5+r5,1.]),np.array([1.,0.5+r5,0.5-r5,0.])
+    if n==5:
+        r37 = 0.5 * np.sqrt(3./7.)
+        return np.array([0.,0.5-r37,0.5,0.5+r37,1.]),np.array([1.,0.5+r37,0.5,0.5-r37,0.])
+    raise Exception('Uncoded order')
+
+def quad_average(y):
+    """Returns the average value found by quadrature at order n.
+    y is a list of values in order from x=-1 to x=1."""
+    if len(y)==2: # 1, 1
+        d = 1./2.
+        return d * ( y[0] + y[1] )
+    if len(y)==3: # 1/3, 4/3, 1/3
+        d = 1./6.
+        return d * ( 4. * y[1] + ( y[0] + y[2] ) )
+    if len(y)==4: # 1/6, 5/6, 5/6, 1/6
+        d = 1. / 12.
+        return d * ( 5. * ( y[1] + y[2] ) + ( y[0] + y[3] ) )
+    if len(y)==5: # 9/10, 49/90, 64/90, 49/90, 9/90
+        d = 1. / 180.
+        return d * ( 64.* y[2] + ( 49. * ( y[1] + y[3] ) )  + 9. * ( y[0] + y[4] ) )
+    raise Exception('Uncoded order')
+    
+def quad_average_2d(y):
+    """Returns the average value found by quadrature at order n.
+    y is a list of values in order from x1=-1 to x1=1 and x2=-1 to x2=1."""
+    if y.shape[0] != y.shape[1]:
+        raise Exception('Input array is not squared!')
+        
+    if y.shape[0]==2: # 1, 1
+        d = 1./2.
+        return d * d * ( y[0,0] + y[0,1] + y[1,0] + y[1,1] )
+    if y.shape[0]==3: # 1/3, 4/3, 1/3
+        d = 1./6.
+        return d * d * ( y[0,0]+y[0,2]+y[2,0]+y[2,2] +4.*(y[0,1]+y[1,0]+y[1,2]+y[2,1] + 4.*y[1,1])) 
+    if y.shape[0]==4: # 1/6, 5/6, 5/6, 1/6
+        d = 1. / 12.
+#       return d * ( 5. * ( y[1] + y[2] ) + ( y[0] + y[3] ) )
+        w = np.array([1.,5.,5.,1.])
+        ysum=0.
+        for j in range(0,y.shape[0]): 
+            for i in range(0,y.shape[1]):
+                ysum = ysum+ w[i]*w[j]*y[j,i]
+        return d * d * ysum
+    if y.shape[0]==5: # 9/10, 49/90, 64/90, 49/90, 9/90
+        d = 1. / 180.
+        #return d * ( 64.* y[2] + ( 49. * ( y[1] + y[3] ) )  + 9. * ( y[0] + y[4] ) )
+        w = np.array([9.,49.,64.,49.,9.])
+        ysum=0.
+        for j in range(0,y.shape[0]): 
+            for i in range(0,y.shape[1]):
+                ysum = ysum+ w[i]*w[j]*y[j,i]
+        return d * d * ysum
+    
+    raise Exception('Uncoded order')
 
 def lagrange_interp(x,y,q):
     """Lagrange polynomial interpolation. Retruns f(q) which f(x) passes through four data
@@ -340,7 +461,7 @@ def mdist(x1,x2):
   """Returns positive distance modulo 360."""
   return np.minimum( np.mod(x1-x2,360.), np.mod(x2-x1,360.) )
 
-def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafix=False):
+def generate_grid_metrics_MIDAS(x,y,axis_units='degrees',Re=_default_Re, latlon_areafix=False):
     nytot,nxtot = x.shape
     if  axis_units == 'm':
       metric=1.0
@@ -380,6 +501,23 @@ def generate_grid_metrics(x,y,axis_units='degrees',Re=_default_Re, latlon_areafi
     angle_dx[:,-1]   = np.arctan2(y[:,-1]-y[:,-2] ,(x[:,-1]-x[:,-2] )*np.cos(y[:,-1]*PI_180))
     angle_dx = angle_dx /PI_180
     return dx,dy,area,angle_dx
+
+def metrics_error(dx_,dy_,area_,Ni,lat1,lat2=90,Re=_default_Re):
+    exact_area = 2*np.pi*(Re**2)*np.abs(np.sin(lat2*PI_180)-np.sin(lat1*PI_180))
+    exact_lat_arc_length = np.abs(lat2-lat1)*PI_180*Re  
+    exact_lon_arc_length = np.cos(lat1*PI_180) *2*np.pi*Re
+
+    grid_lat_arc_length = np.sum(dy_[:,Ni//4]) 
+    grid_lon_arc_length = np.sum(dx_[0,:])
+    if(lat1>lat2):
+        grid_lon_arc_length = np.sum(dx_[-1,:])
+        
+    area_error = 100*(np.sum(area_)-exact_area)/exact_area
+    lat_arc_error = 100*(grid_lat_arc_length - exact_lat_arc_length)/exact_lat_arc_length
+    lon_arc_error = 100*(grid_lon_arc_length -  exact_lon_arc_length)/exact_lon_arc_length
+#    print(exact_area)
+#    print(np.sum(area_))
+    return lat_arc_error,lon_arc_error,area_error
 
 
 def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_changing_meta=None,debug=False):
@@ -451,7 +589,15 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     
     print('   generated regular lat-lon grid between latitudes ', lphiSP[0,0],lphiSP[-1,0])
     print('   number of js=',lphiSP.shape[0])
-    return llamSP,lphiSP
+
+    h_i_inv=llen_lon*PI_180*np.cos(lphiSP*PI_180)/lni
+    h_j_inv=llen_lat*PI_180*np.ones(lphiSP.shape)/lnj
+    delsin_j = np.roll(np.sin(lphiSP*PI_180),shift=-1,axis=0) - np.sin(lphiSP*PI_180)
+    dx_h=h_i_inv[:,:-1]*_default_Re
+    dy_h=h_j_inv[:-1,:]*_default_Re
+    area=delsin_j[:-1,:-1]*_default_Re*_default_Re*llen_lon*PI_180/lni
+
+    return llamSP,lphiSP,dx_h,dy_h,area
 
 def usage():
     print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --reproduce_old8_grids --plot --write_subgrid_files --enhanced_equatorial]')
@@ -563,8 +709,7 @@ def main(argv):
     ###
     if(not reproduce_MIDAS_grids):
         lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)    
-        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
-        
+        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
     else: #use pymidas package   
         from pymidas.rectgrid_gen import supergrid
 
@@ -634,6 +779,8 @@ def main(argv):
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
             
+    print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
+
     if(write_subgrid_files):
         write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source,debug=debug)
 
@@ -658,10 +805,15 @@ def main(argv):
         if(reproduce_old8_grids):
             Nj_ncap=int(refineR* 120)
             lat0_bp=phi_n_Merc
-
-        lamBP,phiBP = generate_bipolar_cap_grid(Ni,Nj_ncap,lat0_bp,lon_bp,lenlon)
-        dxBP,dyBP,areaBP,angleBP = generate_grid_metrics(lamBP,phiBP)
-        
+        #Generate the bipolar grid
+        lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp)
+        #Metrics via MIDAS method
+        dxBP,dyBP,areaBP,angleBP = generate_grid_metrics_MIDAS(lamBP,phiBP)
+        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+        #Metrics via quadratue of h's 
+        rp=np.tan(0.5*(90-lat0_bp)*PI_180)
+        dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
+        print("   CHECK_metrics_hquad: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
     else:
         if(refineR == 2):
             Nj_ncap = 119*refineS  
@@ -682,6 +834,7 @@ def main(argv):
         lamBP,phiBP = tripolar_n.x,tripolar_n.y
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
 
+
     if(write_subgrid_files):
         write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source,debug=debug)
     ###
@@ -700,8 +853,12 @@ def main(argv):
             lenlat_SO = phi_s_Merc-lat0_SO
             Nj_SO  =int(refineR*  55)
 
-        lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
-        dxSO,dySO,areaSO,angleSO = generate_grid_metrics(lamSO,phiSO, latlon_areafix=latlon_areafix)
+        lamSO,phiSO,dxhSO,dyhSO,arhSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
+        dxSO,dySO,areaSO,angleSO = generate_grid_metrics_MIDAS(lamSO,phiSO, latlon_areafix=latlon_areafix)
+        #Metrics errors via MIDAS
+        print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))
+        #Metrics errors via h's 
+        print("   CHECK_h: % errors in (lat arc, lon arc, area)", metrics_error(dxhSO,dyhSO,arhSO,Ni,phiSO[0,0],phiSO[-1,0]))
         
     else:
         if(refineR == 2):
@@ -745,8 +902,10 @@ def main(argv):
                 Nj_scap=int(refineR*  40)
                 lat0_SC=lat0_SO
 
-            lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
-            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
+            lamSC,phiSC,dxhSC,dyhSC,arhSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC,angleSC = generate_grid_metrics_MIDAS(lamSC,phiSC, latlon_areafix=latlon_areafix)
+            #Metrics errors via h's 
+            print("   CHECK_h: % errors in (lat arc, lon arc, area)", metrics_error(dxhSC,dyhSC,arhSC,Ni,phiSC[-1,0],phiSC[0,0]))
         else:
             Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
             spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
@@ -769,7 +928,7 @@ def main(argv):
                 lat0_SC=lat0_SO
 
             lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
-            dxSC,dySC,areaSC,angleSC = generate_grid_metrics(lamSC,phiSC)
+            dxSC,dySC,areaSC,angleSC = generate_grid_metrics_MIDAS(lamSC,phiSC)
             
         else:    
             Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
@@ -791,6 +950,7 @@ def main(argv):
             lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
+    print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
     if(write_subgrid_files):
         write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
     #Concatenate to generate the whole grid
