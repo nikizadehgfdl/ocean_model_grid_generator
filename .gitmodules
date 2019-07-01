@@ -2,3 +2,6 @@
 	path = MIDAS
 	url = https://github.com/nikizadehgfdl/MIDAS.git
 	branch = nikizadehgfl/pymidas_submodule
+[submodule "numpypi"]
+	path = numpypi
+	url = https://github.com/adcroft/numpypi
