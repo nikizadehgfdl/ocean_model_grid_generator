@@ -364,6 +364,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
     x_grid_M = np.tile(lam_M,(Nj+1,1)) 
     print('   Final Mercator grid range=',y_grid_M[0,0],y_grid_M[-1,0])
     print('   number of js=',y_grid_M.shape[0])
+
     return x_grid_M,y_grid_M
 
                                 
@@ -503,16 +504,19 @@ def generate_grid_metrics_MIDAS(x,y,axis_units='degrees',Re=_default_Re, latlon_
             ( 0.5 * ( dx_i[1:,:] + dx_i[:-1,:] ) ) * ( sl[1:,:] - sl[:-1,:] ) )
     else:
         area = 0.25 * ( ( dx[1:,:] + dx[:-1,:] ) * ( dy[:,1:] + dy[:,:-1] ) )
-    angle_dx=np.zeros((nytot,nxtot))
-#    angle_dx = np.arctan2(dy_i,dx_i)/PI_180      
-#    self.angle_dx = numpy.arctan2(dy_i,dx_i)*180.0/numpy.pi
-    # The commented out code above was incorrect for non-Cartesian grids
-    # The corrected version, in addition to including spherical metrics, is centered in the interior and one-sided at the grid edges
+    return dx,dy,area
+
+def angle_x(x,y):
+    """Returns the orientation angle of the grid box"""
+    if x.shape != y.shape:
+        raise Exception('Input arrays do not have the same shape!')
+    angle_dx=np.zeros(x.shape)
+    # The corrected version of angle_dx, in addition to including spherical metrics, is centered in the interior and one-sided at the grid edges
     angle_dx[:,1:-1] = np.arctan2(y[:,2:]-y[:,:-2],(x[:,2:]-x[:,:-2])*np.cos(y[:,1:-1]*PI_180))
     angle_dx[:,0]    = np.arctan2(y[:,1] -y[:,0]  ,(x[:,1] -x[:,0]  )*np.cos(y[:,0]*PI_180))
     angle_dx[:,-1]   = np.arctan2(y[:,-1]-y[:,-2] ,(x[:,-1]-x[:,-2] )*np.cos(y[:,-1]*PI_180))
     angle_dx = angle_dx /PI_180
-    return dx,dy,area,angle_dx
+    return angle_dx
 
 def metrics_error(dx_,dy_,area_,Ni,lat1,lat2=90,Re=_default_Re):
     exact_area = 2*np.pi*(Re**2)*np.abs(np.sin(lat2*PI_180)-np.sin(lat1*PI_180))
@@ -602,14 +606,14 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     print('   generated regular lat-lon grid between latitudes ', lphiSP[0,0],lphiSP[-1,0])
     print('   number of js=',lphiSP.shape[0])
 
-    h_i_inv=llen_lon*PI_180*np.cos(lphiSP*PI_180)/lni
-    h_j_inv=llen_lat*PI_180*np.ones(lphiSP.shape)/lnj
-    delsin_j = np.roll(np.sin(lphiSP*PI_180),shift=-1,axis=0) - np.sin(lphiSP*PI_180)
-    dx_h=h_i_inv[:,:-1]*_default_Re
-    dy_h=h_j_inv[:-1,:]*_default_Re
-    area=delsin_j[:-1,:-1]*_default_Re*_default_Re*llen_lon*PI_180/lni
+#    h_i_inv=llen_lon*PI_180*np.cos(lphiSP*PI_180)/lni
+#    h_j_inv=llen_lat*PI_180*np.ones(lphiSP.shape)/lnj
+#    delsin_j = np.roll(np.sin(lphiSP*PI_180),shift=-1,axis=0) - np.sin(lphiSP*PI_180)
+#    dx_h=h_i_inv[:,:-1]*_default_Re
+#    dy_h=h_j_inv[:-1,:]*_default_Re
+#    area=delsin_j[:-1,:-1]*_default_Re*_default_Re*llen_lon*PI_180/lni
 
-    return llamSP,lphiSP,dx_h,dy_h,area
+    return llamSP,lphiSP
 
 def usage():
     print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --reproduce_old8_grids --plot --write_subgrid_files --enhanced_equatorial]')
@@ -711,37 +715,38 @@ def main(argv):
     if(reproduce_old8_grids):
         latlon_areafix=False
  
+    ###
+    ###Mercator grid
+    ###
     #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
     #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
-#    phi_s_Merc, phi_n_Merc = -68.0, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
+    if(refineR == 2):
+        phi_s_Merc, phi_n_Merc = -68.0, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
 
-    ###
-    ###Mercator grid
-    ###
     if(not reproduce_MIDAS_grids):
-        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)    
-        dxMerc,dyMerc,areaMerc,angleMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
+        lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)  
+        dxMerc,dyMerc,areaMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc, latlon_areafix=latlon_areafix)
+        angleMerc = angle_x(lamMerc,phiMerc)
+        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
     else: #use pymidas package   
-        from pymidas.rectgrid_gen import supergrid
-
+        from pymidas.rectgrid_gen import supergrid        
         if(refineR == 2):
-            Nj_Merc    = 364*refineS  
-            lat0_Merc  = -70.0  # This is a nominal starting latitude for Mercator grid
+            Nj_Merc    = 364*refineS
+            phi_s_Merc  = -70.0  # This is a nominal starting latitude for Mercator grid
             lenlat_Merc= 135.0  # nominal latitude range of Mercator grid
         elif(refineR == 4):    
             Nj_Merc    = 700*refineS
-            lat0_Merc  = -65.0  # This is a nominal starting latitude for Mercator grid
+            phi_s_Merc  = -65.0  # This is a nominal starting latitude for Mercator grid
             lenlat_Merc= 125.0  # nominal latitude range of Mercator grid
         else:
             raise Exception('Unknown resolution for --reproduce_MIDAS_grids')
-        
         #### Begin Mercator Grid
         print ('constructing a mercator supergrid with (ni,nj) = ',Ni,Nj_Merc)
-        print ('nominal starting lat and starting longitude =',lat0_Merc, lon0)
+        print ('nominal starting lat and starting longitude =',phi_s_Merc, lon0)
         print ('and nominal width in latitude = ',lenlat_Merc)
-        mercator=supergrid(Ni,Nj_Merc,'mercator','degrees',lat0_Merc,lenlat_Merc,lon0,360.,cyclic_x=True)
+        mercator=supergrid(Ni,Nj_Merc,'mercator','degrees',phi_s_Merc,lenlat_Merc,lon0,360.,cyclic_x=True)
 
         #Add equatorial enhancement for 1/2 degree MIDAS grid
         if(refineR == 2):
@@ -791,8 +796,7 @@ def main(argv):
         mercator.grid_metrics()
         lamMerc,phiMerc = mercator.x,mercator.y
         dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
-            
-    print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
+        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
 
     if(write_subgrid_files):
         write_nc(lamMerc,phiMerc,dxMerc,dyMerc,areaMerc,angleMerc,axis_units='degrees',fnam=gridfilename+"Merc.nc",description=desc,history=hist,source=source,debug=debug)
@@ -805,36 +809,33 @@ def main(argv):
     ###Northern bipolar cap
     ###
     lon_bp=lon0 # longitude of the displaced pole(s)
+    #Start lattitude from dy above the last Mercator grid
+    lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
+    #Determine the number of bipolar cap grid point in the y direction such that the y resolution
+    #along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
+    #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic behavior for middle points.
+    #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
+    Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
+
+    if(reproduce_old8_grids):
+        Nj_ncap=int(refineR* 120)
+        lat0_bp=phi_n_Merc
+
+    #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
+    if(refineR == 2):
+        Nj_ncap = 119*refineS  
+    elif(refineR == 4):    
+        Nj_ncap = 240*refineS 
 
     if(not reproduce_MIDAS_grids):
-        #Start lattitude from dy above the last Mercator grid
-        lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
-        #Determine the number of bipolar cap grid point in the y direction such that the y resolution
-        #along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
-        #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic behavior for middle points.
-        #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
-        Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
-        
-        if(reproduce_old8_grids):
-            Nj_ncap=int(refineR* 120)
-            lat0_bp=phi_n_Merc
         #Generate the bipolar grid
         lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp)
-        #Metrics via MIDAS method
-        dxBP,dyBP,areaBP,angleBP = generate_grid_metrics_MIDAS(lamBP,phiBP)
-        #print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
         #Metrics via quadratue of h's 
         rp=np.tan(0.5*(90-lat0_bp)*PI_180)
         dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
         print("   CHECK_metrics_hquad: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
-    else:
-        if(refineR == 2):
-            Nj_ncap = 119*refineS  
-        elif(refineR == 4):    
-            Nj_ncap = 240*refineS 
-        else:
-            raise Exception('Unknown resolution for --reproduce_MIDAS_grids')
-            
+        angleBP = angle_x(lamBP,phiBP)
+    else:           
         lat0_bp=mercator.y.max()
         dlat=90.0-lat0_bp
 
@@ -846,7 +847,8 @@ def main(argv):
 
         lamBP,phiBP = tripolar_n.x,tripolar_n.y
         dxBP,dyBP,areaBP,angleBP =tripolar_n.dx,tripolar_n.dy,tripolar_n.area,tripolar_n.angle_dx
-
+    
+        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
 
     if(write_subgrid_files):
         write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source,debug=debug)
@@ -854,33 +856,27 @@ def main(argv):
     ###Southern Ocean grid
     ###
     lat0_SO=-78. #Starting lat
+    #Make the last grid point is a (Mercator) step below the first Mercator lattitude.
+    lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+    #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
+    #the first Mercator dy.     
+    Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
+
+    if(reproduce_old8_grids):
+        lenlat_SO = phi_s_Merc-lat0_SO
+        Nj_SO  =int(refineR*  55)
+    #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
+    if(refineR == 2):
+        Nj_SO = 54*refineS  
+    elif(refineR == 4):    
+        Nj_SO = 110*refineS 
 
     if(not reproduce_MIDAS_grids):
-        #Make the last grid point is a (Mercator) step below the first Mercator lattitude.
-        lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
-        #Determine the number of grid point in the y direction such that the y resolution is equal to (continuous with)
-        #the first Mercator dy.     
-        Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
-
-        if(reproduce_old8_grids):
-            lenlat_SO = phi_s_Merc-lat0_SO
-            Nj_SO  =int(refineR*  55)
-
-        lamSO,phiSO,dxhSO,dyhSO,arhSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
-        dxSO,dySO,areaSO,angleSO = generate_grid_metrics_MIDAS(lamSO,phiSO, latlon_areafix=latlon_areafix)
-        #Metrics errors via MIDAS
-        print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))
-        #Metrics errors via h's 
-        print("   CHECK_h: % errors in (lat arc, lon arc, area)", metrics_error(dxhSO,dyhSO,arhSO,Ni,phiSO[0,0],phiSO[-1,0]))
-        
-    else:
-        if(refineR == 2):
-            Nj_SO = 54*refineS  
-        elif(refineR == 4):    
-            Nj_SO = 110*refineS 
-        else:
-            raise Exception('Unknown resolution for --reproduce_MIDAS_grids. Use either -r 2 or -r 4 ')
-            
+        lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
+        dxSO,dySO,areaSO = generate_grid_metrics_MIDAS(lamSO,phiSO, latlon_areafix=latlon_areafix)
+        angleSO=angle_x(lamSO,phiSO)
+        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))       
+    else:            
         print ('constructing a spherical supergrid with (ny,nx) = ',Ni,Nj_SO)
         print ('nominal starting lat and starting longitude =',lat0_SO, lon0)
         print ('and nominal width in latitude = ',mercator.y.min()-lat0_SO)
@@ -893,6 +889,8 @@ def main(argv):
 
         lamSO,phiSO = spherical.x,spherical.y
         dxSO,dySO,areaSO,angleSO =spherical.dx,spherical.dy,spherical.area,spherical.angle_dx
+        #Metrics errors via MIDAS
+        print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))
 
     if(write_subgrid_files):
         write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source,debug=debug)
@@ -909,18 +907,21 @@ def main(argv):
     halfArc = fullArc/2
 
     if(r_dp == 0.0):
-        if(not reproduce_MIDAS_grids):
-            Nj_scap = int(fullArc/deltaPhiSO)
-            if(reproduce_old8_grids):
-                Nj_scap=int(refineR*  40)
-                lat0_SC=lat0_SO
+        Nj_scap = int(fullArc/deltaPhiSO)
+        if(reproduce_old8_grids):
+            Nj_scap=int(refineR*  40)
+            lat0_SC=lat0_SO
 
-            lamSC,phiSC,dxhSC,dyhSC,arhSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
-            dxSC,dySC,areaSC,angleSC = generate_grid_metrics_MIDAS(lamSC,phiSC, latlon_areafix=latlon_areafix)
-            #Metrics errors via h's 
-            print("   CHECK_h: % errors in (lat arc, lon arc, area)", metrics_error(dxhSC,dyhSC,arhSC,Ni,phiSC[-1,0],phiSC[0,0]))
-        else:
+        #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
+        if(refineR == 4):    
             Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+
+        if(not reproduce_MIDAS_grids):
+            lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC = generate_grid_metrics_MIDAS(lamSC,phiSC, latlon_areafix=latlon_areafix)
+            angleSC=angle_x(lamSC,phiSC)
+            print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
+        else:
             spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
             spherical_cap.grid_metrics()
             print ("spherical cap max/min latitude=", spherical_cap.y.max(),spherical_cap.y.min())
@@ -930,21 +931,27 @@ def main(argv):
 
             lamSC,phiSC = spherical_cap.x,spherical_cap.y
             dxSC,dySC,areaSC,angleSC =spherical_cap.dx,spherical_cap.dy,spherical_cap.area,spherical_cap.angle_dx
+        
+            print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
 
     else:
         doughnut=0.12
         nparts=8
         Nj_scap = int((float(nparts)/float(nparts-1))*halfArc/deltaPhiSO)
-        if(not reproduce_MIDAS_grids):
-            if(reproduce_old8_grids):
-                Nj_scap=int(refineR*  40)
-                lat0_SC=lat0_SO
+        if(reproduce_old8_grids):
+            Nj_scap=int(refineR*  40)
+            lat0_SC=lat0_SO
 
-            lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
-            dxSC,dySC,areaSC,angleSC = generate_grid_metrics_MIDAS(lamSC,phiSC)
-            
-        else:    
+        #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
+        if(refineR == 4):    
             Nj_scap = int(refineR *  40)   #MIDAS has refineS*(  80 for 1/4 degree, ??? for 1/2 degree
+
+        if(not reproduce_MIDAS_grids):
+            lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lenlon,lon_dp,r_dp,lat0_SC,doughnut,nparts, ensure_nj_even=ensure_nj_even)
+            dxSC,dySC,areaSC = generate_grid_metrics_MIDAS(lamSC,phiSC, latlon_areafix=latlon_areafix)
+            angleSC=angle_x(lamSC,phiSC)
+            print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))            
+        else:    
             ny_scap = Nj_scap
             r0_pole = 0.20
             lon0_pole=100.0
@@ -963,7 +970,7 @@ def main(argv):
             lamSC,phiSC = antarctic_cap.x,antarctic_cap.y
             dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
-    print("   CHECK_M: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
+            print("   CHECK_metrics_MIDAS: % errors in (lat arc, lon arc, area)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
     if(write_subgrid_files):
         write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
     #Concatenate to generate the whole grid
@@ -1039,7 +1046,11 @@ def main(argv):
     if(equator_index%2 == 0):
         raise Exception("Ooops: Equator is not going to be a u-point. Use option --south_cutoff_row to one more or on less row from south.")
 
-    write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
+    if(not reproduce_MIDAS_grids):
+        write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
+    else:
+        write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,format='NETCDF3_CLASSIC',description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
+
     print("Wrote the whole grid to file ",gridfilename)
     
     #Visualization
