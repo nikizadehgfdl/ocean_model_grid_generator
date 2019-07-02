@@ -267,7 +267,7 @@ def phi_mercator(Ni, y):
     return np.arctan( np.sinh(y/R) ) * (180/np.pi) # Converted to degrees
 def y_mercator_rounded(Ni, phi):
     y_float = y_mercator(Ni, phi)
-    return ( np.sign(y_float) * np.ceil( np.abs(y_float) ) ).astype(int)
+    return ( np.sign(y_float) * np.round_( np.abs(y_float) ) ).astype(int)
 
 def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_to_u_point=True, ensure_nj_even=True,enhanced_equatorial=False):
     print( 'Requesting Mercator grid with phi range: phi_s,phi_n=', phi_s,phi_n )
@@ -721,7 +721,7 @@ def main(argv):
     #MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
     #MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
     #Instead we use:
-    phi_s_Merc, phi_n_Merc = -66.85954724706843, 64.0589597296948
+    phi_s_Merc, phi_n_Merc = -66.85954725, 64.05895973
     if(refineR == 2):
         phi_s_Merc, phi_n_Merc = -68.0, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
 
