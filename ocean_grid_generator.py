@@ -735,7 +735,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --plot --write_subgrid_files --enhanced_equatorial --gridlist=sc]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
  
 
 def main(argv):
@@ -757,9 +757,10 @@ def main(argv):
     enhanced_equatorial = False
     debug = False
     grids="bipolar,mercator,so,sc,all"
+    calculate_metrics=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -789,6 +790,8 @@ def main(argv):
              smooth_dy = True
         elif opt in ("--plot"):
              plotem = True
+        elif opt in ("--no-metrics"):
+             calculate_metrics= False
         elif opt in ("--write_subgrid_files"):
              write_subgrid_files = True
         elif opt in ("--no_changing_meta"):
@@ -876,9 +879,13 @@ def main(argv):
     if("mercator" in grids or "all" in grids):
         if(not reproduce_MIDAS_grids):
             lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)  
-            dxMerc,dyMerc,areaMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc)
             angleMerc = angle_x(lamMerc,phiMerc)
-            print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
+            dxMerc  =-np.ones([lamMerc.shape[0],lamMerc.shape[1]-1])
+            dyMerc  =-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]])
+            areaMerc=-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]-1])
+            if(calculate_metrics):
+                dxMerc,dyMerc,areaMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc)
+                print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
         else: #use pymidas package   
             from pymidas.rectgrid_gen import supergrid        
             if(refineR == 2):
@@ -957,14 +964,25 @@ def main(argv):
         lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
 
         if(smooth_dy):
+            #The bopolar grid should start from the same lattitude that Mercator ends.
+            #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
+            #This way we get a continous dy and area.
+            lat0_bp = phiMerc[-1,Ni//4]
             #Determine the number of bipolar cap grid point in the y direction such that the y resolution
             #along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
-            #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic behavior for middle points.
+            #Note that int(0.5+x) is used to return the nearest integer to a float with deterministic
+            #behavior for middle points.
             #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
             Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
-
-            #Make the last grid point of SO a (Mercator) step below the first Mercator lattitude.
-            lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+            
+            
+            #Make the last SO grid point a (Mercator) step below the first Mercator lattitude.
+            #lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+            #Niki: I think this is wrong! 
+            #The SO grid should end at the same lattitude that Mercator starts.
+            #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
+            #This way we get a continous dy and area.
+            lenlat_SO = phiMerc[0,Ni//4] - lat0_SO
             #Determine the number of grid point in the y direction such that the y resolution is equal to 
             #(continuous with) the first Mercator dy.     
             Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
@@ -978,8 +996,12 @@ def main(argv):
             lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp)
             #Metrics via quadratue of h's 
             rp=np.tan(0.5*(90-lat0_bp)*PI_180)
-            dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
-            print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+            dxBP  =-np.ones([lamBP.shape[0],lamBP.shape[1]-1])
+            dyBP  =-np.ones([lamBP.shape[0]-1,lamBP.shape[1]])
+            areaBP=-np.ones([lamBP.shape[0]-1,lamBP.shape[1]-1])
+            if(calculate_metrics):
+                dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
+                print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
             angleBP = angle_x(lamBP,phiBP)
         else:           
             lat0_bp=mercator.y.max()
@@ -1005,7 +1027,11 @@ def main(argv):
         ###
         if(not reproduce_MIDAS_grids):
             lamSO,phiSO = generate_latlon_grid(Ni,Nj_SO,lon0,lenlon,lat0_SO,lenlat_SO, ensure_nj_even=ensure_nj_even)
-            dxSO,dySO,areaSO = generate_grid_metrics_MIDAS(lamSO,phiSO)
+            dxSO  =-np.ones([lamSO.shape[0],lamSO.shape[1]-1])
+            dySO  =-np.ones([lamSO.shape[0]-1,lamSO.shape[1]])
+            areaSO=-np.ones([lamSO.shape[0]-1,lamSO.shape[1]-1])
+            if(calculate_metrics):
+                dxSO,dySO,areaSO = generate_grid_metrics_MIDAS(lamSO,phiSO)
             angleSO=angle_x(lamSO,phiSO)
             print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))       
         else:            
@@ -1030,9 +1056,9 @@ def main(argv):
         #The above heuristics produce a displaced pole grid with a nominal resolution 
         #different from the rest of the grid!
         #To get the nominal resolution right  we must instead make the resolution continuous across the joint
-        fullArc = lat0_SC+90.
-        if(smooth_dy):
-            Nj_scap = int(fullArc/deltaPhiSO)
+        #fullArc = lat0_SC+90.
+        #if(smooth_dy):
+        #    Nj_scap = int(fullArc/deltaPhiSO)
 
         if(write_subgrid_files):
             write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source,debug=debug)
@@ -1047,9 +1073,13 @@ def main(argv):
             Nj_scap = int(fullArc/deltaPhiSO)
             if(not reproduce_MIDAS_grids):
                 lamSC,phiSC = generate_latlon_grid(Ni,Nj_scap,lon0,lenlon,-90.,90+lat0_SO, ensure_nj_even=ensure_nj_even)
-                dxSC,dySC,areaSC = generate_grid_metrics_MIDAS(lamSC,phiSC)
                 angleSC=angle_x(lamSC,phiSC)
-                print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
+                dxSC  =-np.ones([lamSC.shape[0],lamSC.shape[1]-1])
+                dySC  =-np.ones([lamSC.shape[0]-1,lamSC.shape[1]])
+                areaSC=-np.ones([lamSC.shape[0]-1,lamSC.shape[1]-1])
+                if(calculate_metrics):
+                    dxSC,dySC,areaSC = generate_grid_metrics_MIDAS(lamSC,phiSC)
+                    print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
             else:
                 spherical_cap=supergrid(Ni,Nj_scap,'spherical','degrees',-90.,lat0_SO+90,lon0,360.,cyclic_x=True)
                 spherical_cap.grid_metrics()
@@ -1064,7 +1094,13 @@ def main(argv):
                 print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
         else:
             if(not reproduce_MIDAS_grids):
-                lon_dp=80.0   # longitude of the displaced pole 
+                lon_dp=80.0   # longitude of the displaced pole
+                if(smooth_dy):
+                    #The SC grid should end at the same lattitude that SO starts.
+                    #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
+                    #This way we get a continous dy and area.
+                    lat0_SC=lat0_SO
+
                 lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)
                 angleSC=angle_x(lamSC,phiSC)
                 if(plotem):
@@ -1072,10 +1108,13 @@ def main(argv):
                     displacedPoleCap_plot2(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10))
 
                 #Quadrature metrics using great circle approximations for the h's
-                dxSC,dySC,areaSC = displacedPoleCap_metrics_quad(4,Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)
-                
-                poles_i=int(Ni*np.mod(lon_dp-lon0,360)/360.)
-                print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,lat1=lat0_SC, lat2=-90.,displaced_pole=poles_i,excluded_fraction=doughnut))
+                dxSC  =-np.ones([lamSC.shape[0],lamSC.shape[1]-1])
+                dySC  =-np.ones([lamSC.shape[0]-1,lamSC.shape[1]])
+                areaSC=-np.ones([lamSC.shape[0]-1,lamSC.shape[1]-1])
+                if(calculate_metrics):
+                    dxSC,dySC,areaSC = displacedPoleCap_metrics_quad(4,Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)   
+                    poles_i=int(Ni*np.mod(lon_dp-lon0,360)/360.)
+                    print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,lat1=lat0_SC, lat2=-90.,displaced_pole=poles_i,excluded_fraction=doughnut))
                 #Compare with MIDAS metrics
                 #dxSC_MIDAS,dySC_MIDAS,areaSC_MIDAS = generate_grid_metrics_MIDAS(lamSC,phiSC)
                 #print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))            
@@ -1133,26 +1172,75 @@ def main(argv):
         #Concatenate to generate the whole grid
         #Start from displaced southern cap and join the southern ocean grid
         print("Stitching the grids together...")
-        x1=np.concatenate((lamSC,lamSO[1:,:]),axis=0)
-        y1=np.concatenate((phiSC,phiSO[1:,:]),axis=0)
-        dx1=np.concatenate((dxSC,dxSO[1:,:]),axis=0)
-        dy1=np.concatenate((dySC,dySO),axis=0)
-        area1=np.concatenate((areaSC,areaSO),axis=0)
-        angle1=np.concatenate((angleSC[:-1,:],angleSO[:-1,:]),axis=0)
-        #Join the Mercator grid
-        x2=np.concatenate((x1,lamMerc[1:,:]),axis=0)
-        y2=np.concatenate((y1,phiMerc[1:,:]),axis=0)
-        dx2=np.concatenate((dx1,dxMerc[1:,:]),axis=0)
-        dy2=np.concatenate((dy1,dyMerc),axis=0)
-        area2=np.concatenate((area1,areaMerc),axis=0)
-        angle2=np.concatenate((angle1,angleMerc[:-1,:]),axis=0)
-        #Join the norhern bipolar cap grid
-        x3=np.concatenate((x2,lamBP[1:,:]),axis=0)
-        y3=np.concatenate((y2,phiBP[1:,:]),axis=0)
-        dx3=np.concatenate((dx2,dxBP[1:,:]),axis=0)
-        dy3=np.concatenate((dy2,dyBP),axis=0)
-        area3=np.concatenate((area2,areaBP),axis=0)
-        angle3=np.concatenate((angle2,angleBP),axis=0)
+
+        #Note that x,y,dx,angle_dx have a shape[0]=nyp1 and should be cut by one (total 3) for the merged variables
+        #to have the right shape.
+        #But y and area have a shape[0]=ny and should not be cut.
+        #Niki: This cut can be done in a few ambigous ways:
+        #    1.  MIDAS way (above) 
+        #    2.  this way  : x1=np.concatenate((lamSC[:-1,:],lamSO),axis=0) 
+        #                    y1=np.concatenate((phiSC[:-1,:],phiSO),axis=0)
+        #                    dx1=np.concatenate((dxSC[:-1,:],dxSO),axis=0)
+        #                    angle1=np.concatenate((angleSC[:-1,:],angleSO),axis=0)
+        #                    #
+        #                    dy1=np.concatenate((dySC,dySO),axis=0)
+        #                    area1=np.concatenate((areaSC,areaSO),axis=0)
+        #     3.  at the very end by restricting to x3[2:,:], ... 
+        #      Which way is "correct"?
+        #      If the sub-grids are disjoint, 1 and 2 introduce a jump in y1 at the joint, 
+        #      as a result y1 and dy1 may become inconsistent?
+        #
+        if(smooth_dy):
+            x1=np.concatenate((lamSC[:-1:,:],lamSO),axis=0)
+            y1=np.concatenate((phiSC[:-1:,:],phiSO),axis=0)
+            dx1=np.concatenate((dxSC[:-1:,:],dxSO),axis=0)
+            dy1=np.concatenate((dySC,dySO),axis=0)
+            area1=np.concatenate((areaSC,areaSO),axis=0)
+            angle1=np.concatenate((angleSC[:-1,:],angleSO),axis=0)
+            #Join the Mercator grid
+            x2=np.concatenate((x1[:-1:,:],lamMerc),axis=0)
+            y2=np.concatenate((y1[:-1:,:],phiMerc),axis=0)
+            dx2=np.concatenate((dx1[:-1:,:],dxMerc),axis=0)
+            dy2=np.concatenate((dy1,dyMerc),axis=0)
+            area2=np.concatenate((area1,areaMerc),axis=0)
+            angle2=np.concatenate((angle1[:-1,:],angleMerc),axis=0)
+            #Join the norhern bipolar cap grid
+            x3=np.concatenate((x2[:-1,:],lamBP),axis=0)
+            y3=np.concatenate((y2[:-1,:],phiBP),axis=0)
+            dx3=np.concatenate((dx2[:-1,:],dxBP),axis=0)
+            dy3=np.concatenate((dy2,dyBP),axis=0)
+            area3=np.concatenate((area2,areaBP),axis=0)
+            angle3=np.concatenate((angle2[:-1,:],angleBP),axis=0)
+            dy3_ = np.roll(y3[:,Ni//4],shift=-1,axis=0) - y3[:,Ni//4]
+            if(np.any(dy3_ == 0)):
+                raise Exception('lattitude array has repeated values along symmetry meridian!')
+
+        else:
+            x1=np.concatenate((lamSC,lamSO[1:,:]),axis=0)
+            y1=np.concatenate((phiSC,phiSO[1:,:]),axis=0)
+            dx1=np.concatenate((dxSC,dxSO[1:,:]),axis=0)
+            dy1=np.concatenate((dySC,dySO),axis=0)
+            area1=np.concatenate((areaSC,areaSO),axis=0)
+            angle1=np.concatenate((angleSC[:-1,:],angleSO[:-1,:]),axis=0)
+            #Join the Mercator grid
+            x2=np.concatenate((x1,lamMerc[1:,:]),axis=0)
+            y2=np.concatenate((y1,phiMerc[1:,:]),axis=0)
+            dx2=np.concatenate((dx1,dxMerc[1:,:]),axis=0)
+            dy2=np.concatenate((dy1,dyMerc),axis=0)
+            area2=np.concatenate((area1,areaMerc),axis=0)
+            angle2=np.concatenate((angle1,angleMerc[:-1,:]),axis=0)
+            #Join the norhern bipolar cap grid
+            x3=np.concatenate((x2,lamBP[1:,:]),axis=0)
+            y3=np.concatenate((y2,phiBP[1:,:]),axis=0)
+            dx3=np.concatenate((dx2,dxBP[1:,:]),axis=0)
+            dy3=np.concatenate((dy2,dyBP),axis=0)
+            area3=np.concatenate((area2,areaBP),axis=0)
+            angle3=np.concatenate((angle2,angleBP),axis=0)
+
+        dy3_ = np.roll(y3[:,Ni//4],shift=-1,axis=0) - y3[:,Ni//4]
+        if(np.any(dy3_ == 0)):
+            print('WARNING: lattitude array has repeated values along symmetry meridian! Try option --smooth_dy')
+
 
         ##Drop the first 80 points from the southern cap! Make this an option!
         if(south_cutoff_row > 0):
@@ -1175,6 +1263,8 @@ def main(argv):
             area3 = area3[jcut:,:]
             angle3 = angle3[jcut:,:]
 
+
+            
 
         #write the whole grid file    
         desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "

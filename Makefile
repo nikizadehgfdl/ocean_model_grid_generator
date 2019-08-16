@@ -29,6 +29,14 @@ ocean_hgrid_res0.125.nc:
 	#module swap python/3.6.4 On gfdl pan
 ocean_hgrid_res0.5_equenh.nc: 
 	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --rdp 0 --south_cutoff_row 128 --no_changing_meta --write_subgrid_files --enhanced_equatorial
+ocean_hgrid_res0.25_smooth.nc:
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.25_smooth.nc -r 4 --south_cutoff_row 65 --smooth_dy --write_subgrid_files --no_changing_meta
+ocean_hgrid_res0.125_smooth.nc:
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.125_smooth.nc -r 8 --south_cutoff_row 5 --smooth_dy --write_subgrid_files --no_changing_meta
+	#module swap python/3.6.4 On gfdl pan
+ocean_hgrid_res0.5_equenh_smooth.nc: 
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.5_equenh_smooth.nc -r 2 --rdp 0 --south_cutoff_row 122 --smooth_dy --no_changing_meta --write_subgrid_files --enhanced_equatorial
+
 
 #MIDAS grids, work only on gfdl PAN
 ocean_hgrid_res0.5_MIDAS.nc:
