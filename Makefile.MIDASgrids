@@ -1,0 +1,20 @@
+TARGS = ocean_hgrid_res0.5_MIDAS.nc \
+	ocean_hgrid_res0.25_MIDAS.nc 
+
+all: $(TARGS) 
+
+#MIDAS grids, work only on gfdl PAN
+ocean_hgrid_res0.5_MIDAS.nc:
+	#module swap python/2.7.3_workstation On gfdl pan
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.5_MIDAS.nc -r 2 --rdp 0 --south_cutoff_row 130 --reproduce_MIDAS_grids --non_smooth_dy --write_subgrid_files --no_changing_meta
+ocean_hgrid_res0.25_MIDAS.nc:
+	#module swap python/2.7.3_workstation On gfdl pan
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.25_MIDAS.nc -r 4 --south_cutoff_row 81 --reproduce_MIDAS_grids --non_smooth_dy --write_subgrid_files --no_changing_meta
+
+check:
+	#module load nccmp 
+	nccmp -d /archive/gold/datasets/OM4_05/mosaic_ocean.v20180227.unpacked/ocean_hgrid.nc ocean_hgrid_res0.5_MIDAS.nc
+	nccmp -d /archive/gold/datasets/OM4_025/mosaic.v20170622.unpacked/ocean_hgrid.nc ocean_hgrid_res0.25_MIDAS.nc
+
+clean:
+	rm -f $(TARGS) $(DEPS) ocean_hgrid_res*MIDAS*.nc
