@@ -355,7 +355,7 @@ def displacedPoleCap_projection(lon_grid,lat_grid,z_0,r_joint):
     r = np.tan((90+lat_grid) *PI_180)/r_joint
     #Find the theta that has matching resolution at the unit circle with longitude at the joint
     #This is a conformal transformation of the unit circle (inverse to the one below)
-    e2itheta = np.exp(1j*lon_grid*PI_180) 
+    e2itheta = np.cos(lon_grid*PI_180) + 1j*np.sin(lon_grid*PI_180)
     e2ithetaprime = (e2itheta - z_0)/(1. - np.conj(z_0)*e2itheta)
     #Conformal map to displace pole from r=0 to r=r_dispole
     z=r*e2ithetaprime
@@ -392,7 +392,7 @@ def displacedPoleCap_mesh(i,j,ni,nj,lon0,lat0,lam_pole,r_pole,excluded_fraction=
     phig = np.tile(latg.reshape((latg.shape[0],1)),(1,long.shape[0]))
     #Projection from center of globe to plane tangent at south pole
     r_joint = np.tan((90+lat0)*PI_180) 
-    z_0= r_pole * np.exp(1j*(lam_pole)*PI_180) 
+    z_0= r_pole * (np.cos(lam_pole*PI_180)+1j*np.sin(lam_pole*PI_180)) 
     lams,phis = displacedPoleCap_projection(lamg,phig,z_0,r_joint)
 
     if excluded_fraction is not None:
