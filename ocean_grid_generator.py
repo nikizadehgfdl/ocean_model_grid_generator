@@ -738,7 +738,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --non_smooth_dy --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
  
 
 def main(argv):
@@ -753,7 +753,7 @@ def main(argv):
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
-    smooth_dy = True
+    smooth_dy = False
     write_subgrid_files = False
     plotem = False
     no_changing_meta = False
@@ -763,7 +763,7 @@ def main(argv):
     calculate_metrics=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","non_smooth_dy","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -789,8 +789,8 @@ def main(argv):
              doughnut = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
-        elif opt in ("--non_smooth_dy"):
-             smooth_dy = False
+        elif opt in ("--smooth_dy"):
+             smooth_dy = True
         elif opt in ("--plot"):
              plotem = True
         elif opt in ("--no-metrics"):
@@ -877,7 +877,7 @@ def main(argv):
 
 
     #Ensure the number of j partitions are even for the sub-grids
-    ensure_nj_even=True
+    ensure_nj_even=False
  
     if("mercator" in grids or "all" in grids):
         if(not reproduce_MIDAS_grids):
@@ -996,7 +996,7 @@ def main(argv):
     if("bipolar" in grids or "all" in grids):
         if(not reproduce_MIDAS_grids):
             #Generate the bipolar grid
-            lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp)
+            lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=ensure_nj_even)
             #Metrics via quadratue of h's 
             rp=np.tan(0.5*(90-lat0_bp)*PI_180)
             dxBP  =-np.ones([lamBP.shape[0],lamBP.shape[1]-1])
@@ -1319,7 +1319,7 @@ def main(argv):
 
         if(write_subgrid_files):
             if(hasSC):
-                write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source)
+                write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
             else:
                 print("There remained no South Pole cap grid because of the number of rows cut= ", jcut, lamSC.shape[0])
         if(plotem):
