@@ -366,15 +366,19 @@ def displacedPoleCap_projection(lon_grid,lat_grid,z_0,r_joint):
     #np.angle returns a value in the interval (-180,180)
     #However the input grid longitude is in (-lon0,-lon0+360), e.g., (-300,60)
     #We should shift the angle to be in that interval
-    lamcDP = np.where(lamcDP>lon_grid[0,-1],lamcDP-360,lamcDP)
-    lamcDP = np.where(lamcDP<lon_grid[0,0] ,lamcDP+360,lamcDP)
-    #Niki: The second condition above is ad hoc. Work on a more elaborate condition to get rid of the  discontinuity at lon_grid>60
-    #Another adhoc fix for single point correction
-    lamcDP[-1,0] = lamcDP[-1,0]-360
+    ##But we should also be careful to produce a monotonically increasing longitude, starting from lon0.
+    lamcDP = monotonic_bounding(lamcDP,lon_grid[0,0])
     #
     rw=np.absolute(w)
     phicDP = -90+np.arctan(rw*r_joint)/PI_180
     return lamcDP,phicDP
+    
+def monotonic_bounding(x,x_0):
+    x_im1= x[:,0]*0 + x_0 #Initial value
+    for i in range(0,x.shape[1]):
+        x[:,i]=np.where(x[:,i]-x_im1[:] > 100, x[:,i]-360, x[:,i])
+        x_im1[:] = x[:,i]  
+    return x
     
 def displacedPoleCap_baseGrid(i,j,ni,nj,lon0,lat0):
     u = lon0  + i * 360./float(ni)
