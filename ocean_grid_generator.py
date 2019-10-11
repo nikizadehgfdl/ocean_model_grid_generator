@@ -742,7 +742,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
  
 
 def main(argv):
@@ -765,9 +765,11 @@ def main(argv):
     debug = False
     grids="bipolar,mercator,so,sc,all"
     calculate_metrics=True
+    #Ensure the number of j partitions are even for the sub-grids
+    ensure_nj_even=False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -795,6 +797,8 @@ def main(argv):
              reproduce_MIDAS_grids = True
         elif opt in ("--smooth_dy"):
              smooth_dy = True
+        elif opt in ("--even_j"):
+             ensure_nj_even = True
         elif opt in ("--plot"):
              plotem = True
         elif opt in ("--no-metrics"):
@@ -878,10 +882,6 @@ def main(argv):
     Nj_scap = Nj_scap *7//4
     doughnut = 0.28 *7/4
     lat0_SC=lat0_SO
-
-
-    #Ensure the number of j partitions are even for the sub-grids
-    ensure_nj_even=False
  
     if("mercator" in grids or "all" in grids):
         if(not reproduce_MIDAS_grids):
