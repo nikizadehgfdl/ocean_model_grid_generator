@@ -743,7 +743,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --match_dy --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
  
 
 def main(argv):
@@ -758,7 +758,7 @@ def main(argv):
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
-    smooth_dy = False
+    match_dy = False
     write_subgrid_files = False
     plotem = False
     no_changing_meta = False
@@ -770,7 +770,7 @@ def main(argv):
     ensure_nj_even=False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -796,8 +796,8 @@ def main(argv):
              doughnut = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
-        elif opt in ("--smooth_dy"):
-             smooth_dy = True
+        elif opt in ("--match_dy"):
+             match_dy = True
         elif opt in ("--even_j"):
              ensure_nj_even = True
         elif opt in ("--plot"):
@@ -972,7 +972,7 @@ def main(argv):
         #Start lattitude from dy above the last Mercator grid
         lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
 
-        if(smooth_dy):
+        if(match_dy):
             #The bopolar grid should start from the same lattitude that Mercator ends.
             #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
             #This way we get a continous dy and area.
@@ -1067,7 +1067,7 @@ def main(argv):
         #different from the rest of the grid!
         #To get the nominal resolution right  we must instead make the resolution continuous across the joint
         #fullArc = lat0_SC+90.
-        #if(smooth_dy):
+        #if(match_dy):
         #    Nj_scap = int(fullArc/deltaPhiSO)
 
         if(write_subgrid_files):
@@ -1106,7 +1106,7 @@ def main(argv):
         else:
             if(not reproduce_MIDAS_grids):
                 lon_dp=80.0   # longitude of the displaced pole
-                if(smooth_dy):
+                if(match_dy):
                     #The SC grid should end at the same lattitude that SO starts.
                     #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
                     #This way we get a continous dy and area.
@@ -1197,7 +1197,7 @@ def main(argv):
         #      as a result y1 and dy1 may become inconsistent?
         #
         hasSC=True
-        if(smooth_dy):
+        if(match_dy):
             #Cut the grid at south according to the options!
             #We may need to cut the whole SC grid and some of the SO
             cut=False
@@ -1323,7 +1323,7 @@ def main(argv):
 
         dy3_ = np.roll(y3[:,Ni//4],shift=-1,axis=0) - y3[:,Ni//4]
         if(np.any(dy3_ == 0)):
-            print('WARNING: lattitude array has repeated values along symmetry meridian! Try option --smooth_dy')
+            print('WARNING: lattitude array has repeated values along symmetry meridian! Try option --match_dy')
 
         if(write_subgrid_files):
             if(hasSC):
