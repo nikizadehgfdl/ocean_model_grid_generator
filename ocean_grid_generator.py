@@ -119,7 +119,7 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
     dyq = np.zeros([ny+1,nx+1])
     
     j1d = np.empty([0])
-    for j in range(0,ny):  
+    for j in range(0,ny+1):
         j_s = b*j + a*(j+1)
         if(j_s[-1]==ny): j_s[-1]=ny-0.001 #avoid phi=90 as this will cause errore. 
                                           #Niki:Find a way to avoid this properly. 
@@ -128,10 +128,12 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
         j1d = np.append(j1d,j_s)
 
     i1d = np.empty([0])
-    for i in range(0,nx):  
+    for i in range(0,nx+1):
         i_s = b*i + a*(i+1)
         i1d = np.append(i1d,i_s)
 
+    #lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
+    #Or to make it faster:
     nj,ni = j1d.shape[0],i1d.shape[0] # Shape of results
     dj = min(nj, max(32*1024//ni,1)) # Stride to use that fits in memory
     lams,phis,dx,dy = np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni))
@@ -139,15 +141,14 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
         je = min(nj,j+dj)
         lams[j:je],phis[j:je],dx[j:je],dy[j:je] = bipolar_cap_ij_array(i1d,j1d[j:je],nx,ny,lat0_bp,lon_bp,rp)
 
-   #lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
     #reshape to send for quad averaging
-    dx_r = dx.reshape(ny,order,nx,order)
-    dy_r = dy.reshape(ny,order,nx,order)
+    dx_r = dx.reshape(ny+1,order,nx+1,order)
+    dy_r = dy.reshape(ny+1,order,nx+1,order)
     #area element
     dxdy_r = dx_r*dy_r
 
-    for j in range(0,ny):  
-        for i in range(0,nx):
+    for j in range(0,ny+1):
+        for i in range(0,nx+1):
             daq[j,i] = quad_average_2d(dxdy_r[j,:,i,:])
             dxq[j,i] = quad_average(dx_r[j,0,i,:])
             dyq[j,i] = quad_average(dy_r[j,:,i,0])
@@ -891,6 +892,7 @@ def main(argv):
             dyMerc  =-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]])
             areaMerc=-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]-1])
             if(calculate_metrics):
+                #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                 dxMerc,dyMerc,areaMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc)
                 print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
         else: #use pymidas package   
@@ -1008,7 +1010,7 @@ def main(argv):
             areaBP=-np.ones([lamBP.shape[0]-1,lamBP.shape[1]-1])
             if(calculate_metrics):
                 dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
-                print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+                print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc1, lon arc2)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.,bipolar=True))
             angleBP = angle_x(lamBP,phiBP)
         else:           
             lat0_bp=mercator.y.max()
@@ -1038,6 +1040,7 @@ def main(argv):
             dySO  =-np.ones([lamSO.shape[0]-1,lamSO.shape[1]])
             areaSO=-np.ones([lamSO.shape[0]-1,lamSO.shape[1]-1])
             if(calculate_metrics):
+                #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                 dxSO,dySO,areaSO = generate_grid_metrics_MIDAS(lamSO,phiSO)
             angleSO=angle_x(lamSO,phiSO)
             print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))       
@@ -1085,6 +1088,7 @@ def main(argv):
                 dySC  =-np.ones([lamSC.shape[0]-1,lamSC.shape[1]])
                 areaSC=-np.ones([lamSC.shape[0]-1,lamSC.shape[1]-1])
                 if(calculate_metrics):
+                    #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                     dxSC,dySC,areaSC = generate_grid_metrics_MIDAS(lamSC,phiSC)
                     print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
             else:
