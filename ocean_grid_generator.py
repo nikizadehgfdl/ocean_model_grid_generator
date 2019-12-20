@@ -11,6 +11,7 @@ import datetime, os, subprocess
 PI_180 = np.pi/180.
 #_default_Re = 6.378e6
 _default_Re = 6371.e3 #MIDAS
+HUGE = 1.0e20
 
 def chksum(x, lbl):
     import hashlib
@@ -32,17 +33,17 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
        """
     ### symmetry meridian resolution fix 
     phig = 90-2*np.arctan(np.tan(0.5*(90-phig)*PI_180)/rp)/PI_180
-    #Simplify  the formulas to avoid division by zero
-    alpha2 = (np.cos((lamg-lon_bp)*PI_180))**2
+    tmp = mdist(lamg,lon_bp)*PI_180       
+    sinla = np.sin(tmp)  #This makes phis symmetric 
+    sphig = np.sin(phig*PI_180)
+    A=sinla*sphig
+    alpha2 = (np.cos(tmp))**2 #This makes dy symmetric
     beta2_inv = (np.tan(phig*PI_180))**2
-    A=np.sqrt(1-alpha2)*np.sin(phig*PI_180) #Actually two equations  +- |A|    
     rden = 1./(1.+alpha2*beta2_inv)
-    B=np.sqrt((1.-alpha2)*rden) #Actually two equations  +- |B|
+    B=sinla*np.sqrt(rden) #Actually two equations  +- |B|
     #Deal with beta=0
     B=np.where(np.abs(beta2_inv)>1.0E20 , 0.0, B)
-    
     lamc = np.arcsin(B)/PI_180
-    chic = np.arccos(A)
     ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
     ##We have to pickup the "correct" root. 
     ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
@@ -54,20 +55,21 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
     lamc = np.where((lamg-lon_bp==90),90,lamc)    #Along symmetry meridian choose lamc=90-lon_bp
     lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp    
     lams = lamc + lon_bp
+
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
     ##then we have tan(\phi_s'/2)=tan(\phi_p'/2)tan(\phi_c'/2)
+    chic = np.arccos(A)
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
     ##Calculate the Metrics
-    rden = 1. / (1 + (rp*np.tan(chic/2))**2)
-    M_inv = rp * (1 + (np.tan(chic/2))**2) * rden
+    rden2 = 1. / (1 + (rp*np.tan(chic/2))**2)
+    M_inv = rp * (1 + (np.tan(chic/2))**2) * rden2
     M = 1/M_inv
     chig = (90-phig)*PI_180
-    rden = 1. / (1 + (rp*np.tan(chig/2))**2)
-    N     = rp * (1 + (np.tan(chig/2))**2) * rden
+    rden2 = 1. / (1 + (rp*np.tan(chig/2))**2)
+    N     = rp * (1 + (np.tan(chig/2))**2) * rden2
     N_inv = 1/N    
     cos2phis = (np.cos(phis*PI_180))**2 
 
-    rden = 1. / (1+alpha2*beta2_inv)
     h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv) * (rden**2) \
             +  M_inv*M_inv*(1-alpha2) * rden
     #Deal with beta=0. Prove that cos2phis/alpha2 ---> 0 when alpha, beta  ---> 0
