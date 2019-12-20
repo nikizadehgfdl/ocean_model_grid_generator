@@ -11,7 +11,7 @@ import datetime, os, subprocess
 PI_180 = np.pi/180.
 #_default_Re = 6.378e6
 _default_Re = 6371.e3 #MIDAS
-HUGE = 1.0e20
+HUGE = 1.0e30
 
 def chksum(x, lbl):
     import hashlib
@@ -24,7 +24,7 @@ def chksum(x, lbl):
     print(hashlib.sha256(y).hexdigest(), '%10s'%lbl, 'min = %.15f'%ymin, 'max = %.15f'%ymax,
           'mean = %.15f'%ymean, 'sd = %.15f'%ysd)
 
-def bipolar_projection(lamg,phig,lon_bp,rp):
+def bipolar_projection(lamg,phig,lon_bp,rp, metrics_only=False):
     """Makes a stereographic bipolar projection of the input coordinate mesh (lamg,phig)  
        Returns the projected coordinate mesh and their metric coefficients (h^-1).
        The input mesh must be a regular spherical grid capping the pole with:
@@ -36,28 +36,30 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
     tmp = mdist(lamg,lon_bp)*PI_180       
     sinla = np.sin(tmp)  #This makes phis symmetric 
     sphig = np.sin(phig*PI_180)
-    A=sinla*sphig
     alpha2 = (np.cos(tmp))**2 #This makes dy symmetric
     beta2_inv = (np.tan(phig*PI_180))**2
     rden = 1./(1.+alpha2*beta2_inv)
-    B=sinla*np.sqrt(rden) #Actually two equations  +- |B|
-    #Deal with beta=0
-    B=np.where(np.abs(beta2_inv)>1.0E20 , 0.0, B)
-    lamc = np.arcsin(B)/PI_180
-    ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
-    ##We have to pickup the "correct" root. 
-    ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
-    ##I am sure there is a more mathematically concrete way to do this.
-    lamc = np.where((lamg-lon_bp>90)&(lamg-lon_bp<=180),180-lamc,lamc)
-    lamc = np.where((lamg-lon_bp>180)&(lamg-lon_bp<=270),180+lamc,lamc)
-    lamc = np.where((lamg-lon_bp>270),360-lamc,lamc)
-    #Along symmetry meridian choose lamc
-    lamc = np.where((lamg-lon_bp==90),90,lamc)    #Along symmetry meridian choose lamc=90-lon_bp
-    lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp    
-    lams = lamc + lon_bp
+
+    if(not metrics_only):
+        B=sinla*np.sqrt(rden) #Actually two equations  +- |B|
+        #Deal with beta=0
+        B=np.where(np.abs(beta2_inv)>HUGE , 0.0, B)
+        lamc = np.arcsin(B)/PI_180
+        ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
+        ##We have to pickup the "correct" root. 
+        ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
+        ##I am sure there is a more mathematically concrete way to do this.
+        lamc = np.where((lamg-lon_bp>90)&(lamg-lon_bp<=180),180-lamc,lamc)
+        lamc = np.where((lamg-lon_bp>180)&(lamg-lon_bp<=270),180+lamc,lamc)
+        lamc = np.where((lamg-lon_bp>270),360-lamc,lamc)
+        #Along symmetry meridian choose lamc
+        lamc = np.where((lamg-lon_bp==90),90,lamc)    #Along symmetry meridian choose lamc=90-lon_bp
+        lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp    
+        lams = lamc + lon_bp
 
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
     ##then we have tan(\phi_s'/2)=tan(\phi_p'/2)tan(\phi_c'/2)
+    A=sinla*sphig
     chic = np.arccos(A)
     phis = 90 - 2 * np.arctan(rp * np.tan(chic/2))/PI_180
     ##Calculate the Metrics
@@ -73,14 +75,18 @@ def bipolar_projection(lamg,phig,lon_bp,rp):
     h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv) * (rden**2) \
             +  M_inv*M_inv*(1-alpha2) * rden
     #Deal with beta=0. Prove that cos2phis/alpha2 ---> 0 when alpha, beta  ---> 0
-    h_j_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_j_inv)        
+    h_j_inv=np.where(np.abs(beta2_inv)>HUGE , M_inv*M_inv, h_j_inv)        
     h_j_inv = np.sqrt(h_j_inv)*N_inv 
 
     h_i_inv = cos2phis * (1+beta2_inv) * (rden**2) + M_inv*M_inv*alpha2*beta2_inv * rden
     #Deal with beta=0
-    h_i_inv=np.where(np.abs(beta2_inv)>1.0E20 , M_inv*M_inv, h_i_inv)    
+    h_i_inv=np.where(np.abs(beta2_inv)>HUGE , M_inv*M_inv, h_i_inv)    
     h_i_inv = np.sqrt(h_i_inv) 
-    return lams,phis,h_i_inv,h_j_inv
+
+    if(not metrics_only):
+        return lams,phis,h_i_inv,h_j_inv
+    else:
+        return h_i_inv,h_j_inv
 
 def generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=True):
     #Define a (lon,lat) coordinate mesh on the Northern hemisphere of the globe sphere
@@ -108,10 +114,10 @@ def bipolar_cap_ij_array(i,j,Ni,Nj_ncap,lat0_bp,lon_bp,rp):
     latg = lat0_bp + j * (90-lat0_bp)/float(Nj_ncap)
     lamg = np.tile(long,(latg.shape[0],1)) 
     phig = np.tile(latg.reshape((latg.shape[0],1)),(1,long.shape[0]))
-    lams,phis,h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp)
+    h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp,metrics_only=True)
     h_i_inv = h_i_inv * 2*np.pi/float(Ni)
     h_j_inv = h_j_inv * (90-lat0_bp)*PI_180/float(Nj_ncap)
-    return lams,phis,h_i_inv,h_j_inv
+    return h_i_inv,h_j_inv
 
 def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
     print("   Calculating bipolar cap metrics via quadrature ...")
@@ -134,14 +140,14 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
         i_s = b*i + a*(i+1)
         i1d = np.append(i1d,i_s)
 
-    #lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
+    #dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
     #Or to make it faster:
     nj,ni = j1d.shape[0],i1d.shape[0] # Shape of results
     dj = min(nj, max(32*1024//ni,1)) # Stride to use that fits in memory
     lams,phis,dx,dy = np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni))
     for j in range(0,nj,dj):
         je = min(nj,j+dj)
-        lams[j:je],phis[j:je],dx[j:je],dy[j:je] = bipolar_cap_ij_array(i1d,j1d[j:je],nx,ny,lat0_bp,lon_bp,rp)
+        dx[j:je],dy[j:je] = bipolar_cap_ij_array(i1d,j1d[j:je],nx,ny,lat0_bp,lon_bp,rp)
 
     #reshape to send for quad averaging
     dx_r = dx.reshape(ny+1,order,nx+1,order)
