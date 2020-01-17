@@ -119,7 +119,7 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
     dyq = np.zeros([ny+1,nx+1])
     
     j1d = np.empty([0])
-    for j in range(0,ny):  
+    for j in range(0,ny+1):
         j_s = b*j + a*(j+1)
         if(j_s[-1]==ny): j_s[-1]=ny-0.001 #avoid phi=90 as this will cause errore. 
                                           #Niki:Find a way to avoid this properly. 
@@ -128,10 +128,12 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
         j1d = np.append(j1d,j_s)
 
     i1d = np.empty([0])
-    for i in range(0,nx):  
+    for i in range(0,nx+1):
         i_s = b*i + a*(i+1)
         i1d = np.append(i1d,i_s)
 
+    #lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
+    #Or to make it faster:
     nj,ni = j1d.shape[0],i1d.shape[0] # Shape of results
     dj = min(nj, max(32*1024//ni,1)) # Stride to use that fits in memory
     lams,phis,dx,dy = np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni)),np.zeros((nj,ni))
@@ -139,15 +141,14 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
         je = min(nj,j+dj)
         lams[j:je],phis[j:je],dx[j:je],dy[j:je] = bipolar_cap_ij_array(i1d,j1d[j:je],nx,ny,lat0_bp,lon_bp,rp)
 
-   #lams,phis,dx,dy = bipolar_cap_ij_array(i1d,j1d,nx,ny,lat0_bp,lon_bp,rp)
     #reshape to send for quad averaging
-    dx_r = dx.reshape(ny,order,nx,order)
-    dy_r = dy.reshape(ny,order,nx,order)
+    dx_r = dx.reshape(ny+1,order,nx+1,order)
+    dy_r = dy.reshape(ny+1,order,nx+1,order)
     #area element
     dxdy_r = dx_r*dy_r
 
-    for j in range(0,ny):  
-        for i in range(0,nx):
+    for j in range(0,ny+1):
+        for i in range(0,nx+1):
             daq[j,i] = quad_average_2d(dxdy_r[j,:,i,:])
             dxq[j,i] = quad_average(dx_r[j,0,i,:])
             dyq[j,i] = quad_average(dy_r[j,:,i,0])
@@ -742,7 +743,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     return llamSP,lphiSP
 
 def usage():
-    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --smooth_dy --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
+    print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --match_dy --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
  
 
 def main(argv):
@@ -757,7 +758,7 @@ def main(argv):
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
-    smooth_dy = False
+    match_dy = False
     write_subgrid_files = False
     plotem = False
     no_changing_meta = False
@@ -769,7 +770,7 @@ def main(argv):
     ensure_nj_even=False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","smooth_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -795,8 +796,8 @@ def main(argv):
              doughnut = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
-        elif opt in ("--smooth_dy"):
-             smooth_dy = True
+        elif opt in ("--match_dy"):
+             match_dy = True
         elif opt in ("--even_j"):
              ensure_nj_even = True
         elif opt in ("--plot"):
@@ -891,6 +892,7 @@ def main(argv):
             dyMerc  =-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]])
             areaMerc=-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]-1])
             if(calculate_metrics):
+                #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                 dxMerc,dyMerc,areaMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc)
                 print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
         else: #use pymidas package   
@@ -970,7 +972,7 @@ def main(argv):
         #Start lattitude from dy above the last Mercator grid
         lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
 
-        if(smooth_dy):
+        if(match_dy):
             #The bopolar grid should start from the same lattitude that Mercator ends.
             #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
             #This way we get a continous dy and area.
@@ -1008,7 +1010,7 @@ def main(argv):
             areaBP=-np.ones([lamBP.shape[0]-1,lamBP.shape[1]-1])
             if(calculate_metrics):
                 dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
-                print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.))
+                print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc1, lon arc2)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.,bipolar=True))
             angleBP = angle_x(lamBP,phiBP)
         else:           
             lat0_bp=mercator.y.max()
@@ -1038,6 +1040,7 @@ def main(argv):
             dySO  =-np.ones([lamSO.shape[0]-1,lamSO.shape[1]])
             areaSO=-np.ones([lamSO.shape[0]-1,lamSO.shape[1]-1])
             if(calculate_metrics):
+                #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                 dxSO,dySO,areaSO = generate_grid_metrics_MIDAS(lamSO,phiSO)
             angleSO=angle_x(lamSO,phiSO)
             print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))       
@@ -1064,7 +1067,7 @@ def main(argv):
         #different from the rest of the grid!
         #To get the nominal resolution right  we must instead make the resolution continuous across the joint
         #fullArc = lat0_SC+90.
-        #if(smooth_dy):
+        #if(match_dy):
         #    Nj_scap = int(fullArc/deltaPhiSO)
 
         if(write_subgrid_files):
@@ -1085,6 +1088,7 @@ def main(argv):
                 dySC  =-np.ones([lamSC.shape[0]-1,lamSC.shape[1]])
                 areaSC=-np.ones([lamSC.shape[0]-1,lamSC.shape[1]-1])
                 if(calculate_metrics):
+                    #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                     dxSC,dySC,areaSC = generate_grid_metrics_MIDAS(lamSC,phiSC)
                     print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
             else:
@@ -1102,7 +1106,7 @@ def main(argv):
         else:
             if(not reproduce_MIDAS_grids):
                 lon_dp=80.0   # longitude of the displaced pole
-                if(smooth_dy):
+                if(match_dy):
                     #The SC grid should end at the same lattitude that SO starts.
                     #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
                     #This way we get a continous dy and area.
@@ -1193,7 +1197,7 @@ def main(argv):
         #      as a result y1 and dy1 may become inconsistent?
         #
         hasSC=True
-        if(smooth_dy):
+        if(match_dy):
             #Cut the grid at south according to the options!
             #We may need to cut the whole SC grid and some of the SO
             cut=False
@@ -1319,7 +1323,7 @@ def main(argv):
 
         dy3_ = np.roll(y3[:,Ni//4],shift=-1,axis=0) - y3[:,Ni//4]
         if(np.any(dy3_ == 0)):
-            print('WARNING: lattitude array has repeated values along symmetry meridian! Try option --smooth_dy')
+            print('WARNING: lattitude array has repeated values along symmetry meridian! Try option --match_dy')
 
         if(write_subgrid_files):
             if(hasSC):
