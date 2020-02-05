@@ -871,7 +871,7 @@ def main(argv):
     #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
     Nj_SO  =int(refineR*  55)
     if(refineR == 2):
-        Nj_SO = 54*refineS  
+        Nj_SO = 54*refineS+1  
     ###
     #Bipolar cap
     ###

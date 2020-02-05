@@ -29,7 +29,7 @@ ocean_hgrid_res1.0.nc:
 ocean_hgrid_res0.5.nc: 
 	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.5.nc -r 2    --rdp 0 --no_changing_meta 
 ocean_hgrid_res0.5_equenh.nc: 
-	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --rdp 0 --south_cutoff_row 128 --no_changing_meta --write_subgrid_files --enhanced_equatorial
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --rdp 0 --south_cutoff_row 130 --no_changing_meta --write_subgrid_files --enhanced_equatorial
 ocean_hgrid_res0.25.nc:
 	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.25.nc -r 4 --south_cutoff_row 83 --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.125.nc:
