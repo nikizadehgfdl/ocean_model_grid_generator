@@ -270,10 +270,11 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
             print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
-    if((y_star[1]-y_star[0]+1)%2 == 0 and ensure_nj_even):
+    if((y_star[1]-y_star[0]+1)%2 == 0):
         print("  *Supergrid has an odd number of area cells!")
-        print("  *Fixing this by shifting the y_star[1] ")
-        y_star[1] = y_star[1] - 1
+        if(ensure_nj_even):
+            print("  *Fixing this by shifting the y_star[1] ")
+            y_star[1] = y_star[1] - 1
     Nj=y_star[1]-y_star[0]
     print( '   Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
     phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
@@ -760,9 +761,7 @@ def main(argv):
     degree_resolution_inverse = 4 # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
     south_cap = True
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
-    doughnut=0.12
-    r_dp=0.20
-    rdp=1
+    r_dp=0.0
     lon_dp=0.0
     south_cutoff_row = 0
     south_cutoff_ang = -90.
@@ -780,7 +779,7 @@ def main(argv):
     shift_equator_to_u_point=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -801,9 +800,7 @@ def main(argv):
         elif opt in ("--south_cutoff_row"):
             south_cutoff_row = int(arg)
         elif opt in ("--rdp"):
-             r_dp = int(arg)*r_dp
-        elif opt in ("--doughnut"):
-             doughnut = float(arg)
+             r_dp = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
         elif opt in ("--match_dy"):
