@@ -263,16 +263,18 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
     print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1  )
     #Ensure that the equator (y=0) is a u-point
     if(y_star[0]%2 == 0):
-        print("   Equator is not going to be a u-point!")
+        print("  *Equator may not be a u-point!")
+        #There is another check for this for the whole grid. 
         if(shift_equator_to_u_point):
-            print("   Fixing this by shifting the bounds!")
+            print("  *Fixing this by shifting the bounds!")
             y_star[0] = y_star[0] - 1
             y_star[1] = y_star[1] - 1
-            #print( 'y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
-    if((y_star[1]-y_star[0]+1)%2 == 0 and ensure_nj_even):
-        print("   Supergrid has an odd number of area cells!")
-        print("   Fixing this by shifting the y_star[1] ")
-        y_star[1] = y_star[1] - 1
+            print( '   y*=',y_star, 'nj=', y_star[1]-y_star[0]+1 )
+    if((y_star[1]-y_star[0]+1)%2 == 0):
+        print("  *Supergrid has an odd number of area cells!")
+        if(ensure_nj_even):
+            print("  *Fixing this by shifting the y_star[1] ")
+            y_star[1] = y_star[1] - 1
     Nj=y_star[1]-y_star[0]
     print( '   Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
     phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
@@ -286,7 +288,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
         print("   Equator is at j=", equator_index)
     #Ensure that the equator (y=0) is a u-point
     if(equator_index%2 == 0):
-        raise Exception("Ooops: Equator is not going to be a u-point")
+        print("  *Equator is not going to be a u-point of this grid patch.")
 
     if(enhanced_equatorial):
         print ('   Enhancing the equator region resolution')
@@ -759,9 +761,7 @@ def main(argv):
     degree_resolution_inverse = 4 # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
     south_cap = True
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
-    doughnut=0.12
-    r_dp=0.20
-    rdp=1
+    r_dp=0.0
     lon_dp=0.0
     south_cutoff_row = 0
     south_cutoff_ang = -90.
@@ -776,9 +776,10 @@ def main(argv):
     calculate_metrics=True
     #Ensure the number of j partitions are even for the sub-grids
     ensure_nj_even=False
+    shift_equator_to_u_point=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","doughnut=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -799,9 +800,7 @@ def main(argv):
         elif opt in ("--south_cutoff_row"):
             south_cutoff_row = int(arg)
         elif opt in ("--rdp"):
-             r_dp = int(arg)*r_dp
-        elif opt in ("--doughnut"):
-             doughnut = float(arg)
+             r_dp = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
         elif opt in ("--match_dy"):
@@ -861,7 +860,8 @@ def main(argv):
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954725, 64.05895973
     if(refineR == 2):
-        phi_s_Merc, phi_n_Merc = -68.0, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
+        phi_s_Merc, phi_n_Merc = -68.05725376601046, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
+        shift_equator_to_u_point= False
     ###
     #Southern Ocean grid
     ###
@@ -894,7 +894,7 @@ def main(argv):
  
     if("mercator" in grids or "all" in grids):
         if(not reproduce_MIDAS_grids):
-            lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)  
+            lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR,shift_equator_to_u_point=shift_equator_to_u_point, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)  
             angleMerc = angle_x(lamMerc,phiMerc)
             dxMerc  =-np.ones([lamMerc.shape[0],lamMerc.shape[1]-1])
             dyMerc  =-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]])
@@ -1369,7 +1369,8 @@ def main(argv):
         #Ensure that the equator (y=0) is a u-point
         if(equator_index%2 == 0):
             raise Exception("Ooops: Equator is not going to be a u-point. Use option --south_cutoff_row to one more or on less row from south.")
-
+        if(y3.shape[0]%2 == 0):
+            raise Exception("Ooops: The number of j's in the supergrid is not even. Use option --south_cutoff_row to one more or on less row from south.") 
         if(not reproduce_MIDAS_grids):
             write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
         else:
