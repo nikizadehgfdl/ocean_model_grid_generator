@@ -860,8 +860,9 @@ def main(argv):
     #Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954725, 64.05895973
     if(refineR == 2):
-        phi_s_Merc, phi_n_Merc = -68.05725376601046, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
-        shift_equator_to_u_point= False
+        #phi_s_Merc, phi_n_Merc = -68.05725376601046, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
+        #shift_equator_to_u_point= False
+        phi_s_Merc, phi_n_Merc = -68.0, 65.0
     ###
     #Southern Ocean grid
     ###
@@ -871,7 +872,7 @@ def main(argv):
     #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
     Nj_SO  =int(refineR*  55)
     if(refineR == 2):
-        Nj_SO = 54*refineS  
+        Nj_SO = 54*refineS+1
     ###
     #Bipolar cap
     ###
