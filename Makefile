@@ -33,7 +33,7 @@ ocean_hgrid_res0.5_equenh.nc:
 ocean_hgrid_res0.25.nc:
 	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.25.nc -r 4 --rdp 0.2 --south_cutoff_row 83 --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.125.nc:
-	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.125.nc -r 8 --rdp 0.2 --south_cutoff_row 5 --write_subgrid_files --no_changing_meta
+	time ./ocean_grid_generator.py $(DEBUG) -f ocean_hgrid_res0.125.nc -r 8 --rdp 0.2 --south_cutoff_row 5 --match_dy --even_j --write_subgrid_files --no_changing_meta
 
 
 hash.md5: | $(TARGS)
