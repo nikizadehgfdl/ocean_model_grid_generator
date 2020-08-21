@@ -1,0 +1,3 @@
+[submodule "numpypi"]
+	path = numpypi
+	url = https://github.com/adcroft/numpypi
