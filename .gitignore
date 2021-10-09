@@ -4,6 +4,7 @@
 __pycache__/
 *.pyc
 *.nc
+/build
 
 # Setuptools distribution folder
 /dist/
