@@ -19,7 +19,7 @@
 #***********************************************************************
 
 # Prelude
-AC_PREREQ([2.71])
+AC_PREREQ([2.63])
 AC_INIT([Ocean Model Grid Generator],[18.0.0],[oar.gfdl.help@noaa.gov],[omgg],[https://github.com/NOAA-GFDL/ocean_model_grid_generator])
 # Place the git description informatin in the configure script
 m4_define([git_revision],
