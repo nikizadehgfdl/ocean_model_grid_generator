@@ -20,7 +20,11 @@
 
 # Prelude
 AC_PREREQ([2.63])
-AC_INIT([Ocean Model Grid Generator],[18.0.0],[oar.gfdl.help@noaa.gov],[omgg],[https://github.com/NOAA-GFDL/ocean_model_grid_generator])
+AC_INIT([Ocean Model Grid Generator],
+        [0.0.1],
+	[oar.gfdl.help@noaa.gov],
+	[omgg],
+	[https://github.com/NOAA-GFDL/ocean_model_grid_generator])
 # Place the git description informatin in the configure script
 m4_define([git_revision],
   [m4_esyscmd_s([git describe --always --dirty 2> /dev/null || echo "unknown version"])])
@@ -36,8 +40,28 @@ AC_ARG_ENABLE([venv],
     [Build a venv to contain the script and all python dependencies])],
     [],
     [enable_venv=no])
-
 AM_CONDITIONAL([ENABLE_VENV], [test x"$enable_venv" = x"yes"])
 
-AC_CONFIG_FILES([Makefile])
+# Find a python version >=3.6
+AC_PATH_PROGS([PYTHON], [python3 python])
+AX_PROG_PYTHON_VERSION([3.6], ,AC_MSG_ERROR([unable to find a python version >=3.6 in PATH]))
+
+# Check for required python modules
+# pytest is needed for tests to run
+AX_PYTHON_MODULE([pytest])
+AC_PATH_PROG([PYTEST], [pytest])
+
+AS_IF([test ${enable_venv:-no} = "yes"], [
+# venv is needed if installing in a virtural environment
+AX_PYTHON_MODULE([venv], [fatal])],[
+# The following are only needed if not using a venv to install
+AX_PYTHON_MODULE([numpypi], [fatal])
+AX_PYTHON_MODULE([netCDF4], [fatal])])
+AM_CONDITIONAL([RUN_PYTESTS], [test ${HAVE_PYMOD_PYTEST:-no} = "yes" || test ${enable_venv:-no} = "yes"])
+
+
+AC_CONFIG_FILES([
+  Makefile
+  t/Makefile
+])
 AC_OUTPUT

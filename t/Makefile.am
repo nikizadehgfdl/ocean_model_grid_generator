@@ -20,17 +20,33 @@
 #
 # Copyright 2021 - @underwoo
 
-SUBDIRS = t
+TEST_EXTENSIONS = .py
+AM_PY_LOG_FALGS = -v
+if ENABLE_VENV
+  AM_TESTS_ENVIRONMENT = . $(abs_builddir)/venv-test/bin/activate;
+  PY_LOG_COMPILER = $(builddir)/venv-test/bin/pytest
+else
+  PY_LOG_COMPILER = $(PYTEST)
+endif
 
-bin_SCRIPTS = ocean_grid_generator.py
+if RUN_PYTESTS
+TESTS = \
+  test_funcs.py \
+  test_ocean_grid_gen.py
+endif
 
 if ENABLE_VENV
-install-exec-local:
-	python3 -m venv $(DESTDIR)$(pkglibexecdir)
-	. $(DESTDIR)$(pkglibexecdir)/bin/activate && \
-	python3 -m pip install --use-feature=in-tree-build git+https://github.com/underwoo/numpypi.git@pip.installable && \
-	python3 -m pip install --use-feature=in-tree-build $(srcdir)
+venv-test:
+	python3 -m venv $(builddir)/venv-test
+	. $(builddir)/venv-test/bin/activate && \
+	python3 -m pip install pytest && \
+	python3 -m pip install git+https://github.com/underwoo/numpypi.git@pip.installable && \
+	python3 -m pip install $(top_srcdir)
 
-install-exec-hook:
-	sed -i -e "s|^#!/usr/bin/env python$$|#!$(pkglibexecdir)/bin/python|" $(DESTDIR)$(bindir)/ocean_grid_generator.py
+test_funcs.py: venv-test
+
+test_ocean_grid_gen.py: venv-test
 endif
+
+clean-local:
+	-rm -rf venv-test
