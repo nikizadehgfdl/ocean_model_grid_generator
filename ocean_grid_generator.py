@@ -334,7 +334,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
         phi3=np.concatenate((phi1[0:-1],phi2))
 
         phi_s = phi3[-1]
-        phi4=np.linspace(phi_s,0,N_enh)
+        phi4=np.linspace(phi_s,0,int(N_enh))
         print("   Meridional range of enhanced resolution=(", phi4[0],",", -phi4[0],").")
         print("   Meridional value of enhanced resolution=", phi4[1]-phi4[0])
         phi5=np.concatenate((phi3[0:-1],phi4))
