@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 
-import numpypi_series as np
+import numpypi.numpypi_series as np
 #import numpy as np
 import sys, getopt
 import datetime, os, subprocess
@@ -25,16 +25,16 @@ def chksum(x, lbl):
           'mean = %.15f'%ymean, 'sd = %.15f'%ysd)
 
 def bipolar_projection(lamg,phig,lon_bp,rp, metrics_only=False):
-    """Makes a stereographic bipolar projection of the input coordinate mesh (lamg,phig)  
+    """Makes a stereographic bipolar projection of the input coordinate mesh (lamg,phig)
        Returns the projected coordinate mesh and their metric coefficients (h^-1).
        The input mesh must be a regular spherical grid capping the pole with:
            latitudes between 2*arctan(rp) and 90  degrees
-           longitude between lon_bp       and lonp+360   
+           longitude between lon_bp       and lonp+360
        """
-    ### symmetry meridian resolution fix 
+    ### symmetry meridian resolution fix
     phig = 90-2*np.arctan(np.tan(0.5*(90-phig)*PI_180)/rp)/PI_180
-    tmp = mdist(lamg,lon_bp)*PI_180       
-    sinla = np.sin(tmp)  #This makes phis symmetric 
+    tmp = mdist(lamg,lon_bp)*PI_180
+    sinla = np.sin(tmp)  #This makes phis symmetric
     sphig = np.sin(phig*PI_180)
     alpha2 = (np.cos(tmp))**2 #This makes dy symmetric
     beta2_inv = (np.tan(phig*PI_180))**2
@@ -45,8 +45,8 @@ def bipolar_projection(lamg,phig,lon_bp,rp, metrics_only=False):
         #Deal with beta=0
         B=np.where(np.abs(beta2_inv)>HUGE , 0.0, B)
         lamc = np.arcsin(B)/PI_180
-        ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l } 
-        ##We have to pickup the "correct" root. 
+        ##But this equation accepts 4 solutions for a given B, {l, 180-l, l+180, 360-l }
+        ##We have to pickup the "correct" root.
         ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
         ##I am sure there is a more mathematically concrete way to do this.
         lamc = np.where((lamg-lon_bp>90)&(lamg-lon_bp<=180),180-lamc,lamc)
@@ -54,7 +54,7 @@ def bipolar_projection(lamg,phig,lon_bp,rp, metrics_only=False):
         lamc = np.where((lamg-lon_bp>270),360-lamc,lamc)
         #Along symmetry meridian choose lamc
         lamc = np.where((lamg-lon_bp==90),90,lamc)    #Along symmetry meridian choose lamc=90-lon_bp
-        lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp    
+        lamc = np.where((lamg-lon_bp==270),270,lamc)  #Along symmetry meridian choose lamc=270-lon_bp
         lams = lamc + lon_bp
 
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
@@ -69,19 +69,19 @@ def bipolar_projection(lamg,phig,lon_bp,rp, metrics_only=False):
     chig = (90-phig)*PI_180
     rden2 = 1. / (1 + (rp*np.tan(chig/2))**2)
     N     = rp * (1 + (np.tan(chig/2))**2) * rden2
-    N_inv = 1/N    
-    cos2phis = (np.cos(phis*PI_180))**2 
+    N_inv = 1/N
+    cos2phis = (np.cos(phis*PI_180))**2
 
     h_j_inv = cos2phis*alpha2*(1-alpha2)*beta2_inv*(1+beta2_inv) * (rden**2) \
             +  M_inv*M_inv*(1-alpha2) * rden
     #Deal with beta=0. Prove that cos2phis/alpha2 ---> 0 when alpha, beta  ---> 0
-    h_j_inv=np.where(np.abs(beta2_inv)>HUGE , M_inv*M_inv, h_j_inv)        
-    h_j_inv = np.sqrt(h_j_inv)*N_inv 
+    h_j_inv=np.where(np.abs(beta2_inv)>HUGE , M_inv*M_inv, h_j_inv)
+    h_j_inv = np.sqrt(h_j_inv)*N_inv
 
     h_i_inv = cos2phis * (1+beta2_inv) * (rden**2) + M_inv*M_inv*alpha2*beta2_inv * rden
     #Deal with beta=0
-    h_i_inv=np.where(np.abs(beta2_inv)>HUGE , M_inv*M_inv, h_i_inv)    
-    h_i_inv = np.sqrt(h_i_inv) 
+    h_i_inv=np.where(np.abs(beta2_inv)>HUGE , M_inv*M_inv, h_i_inv)
+    h_i_inv = np.sqrt(h_i_inv)
 
     if(not metrics_only):
         return lams,phis,h_i_inv,h_j_inv
@@ -90,7 +90,7 @@ def bipolar_projection(lamg,phig,lon_bp,rp, metrics_only=False):
 
 def generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=True):
     #Define a (lon,lat) coordinate mesh on the Northern hemisphere of the globe sphere
-    #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian 
+    #such that the resolution of latg matches the desired resolution of the final grid along the symmetry meridian
     print( 'Generating bipolar grid bounded at latitude ',lat0_bp  )
     if(Nj_ncap%2 != 0 and ensure_nj_even):
         print("   Supergrid has an odd number of area cells!")
@@ -99,7 +99,7 @@ def generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=True):
             Nj_ncap =  Nj_ncap - 1
 
     lon_g = lon_bp  + np.arange(Ni+1) *  360./float(Ni)
-    lamg = np.tile(lon_g,(Nj_ncap+1,1)) 
+    lamg = np.tile(lon_g,(Nj_ncap+1,1))
     latg0_cap = lat0_bp + np.arange(Nj_ncap+1) * (90-lat0_bp)/float(Nj_ncap)
     phig = np.tile(latg0_cap.reshape((Nj_ncap+1,1)),(1,Ni+1))
     rp=np.tan(0.5*(90-lat0_bp)*PI_180)
@@ -112,7 +112,7 @@ def generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=True):
 def bipolar_cap_ij_array(i,j,Ni,Nj_ncap,lat0_bp,lon_bp,rp):
     long = lon_bp  + i * 360./float(Ni)
     latg = lat0_bp + j * (90-lat0_bp)/float(Nj_ncap)
-    lamg = np.tile(long,(latg.shape[0],1)) 
+    lamg = np.tile(long,(latg.shape[0],1))
     phig = np.tile(latg.reshape((latg.shape[0],1)),(1,long.shape[0]))
     h_i_inv,h_j_inv = bipolar_projection(lamg,phig,lon_bp,rp,metrics_only=True)
     h_i_inv = h_i_inv * 2*np.pi/float(Ni)
@@ -125,13 +125,13 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
     daq = np.zeros([ny+1,nx+1])
     dxq = np.zeros([ny+1,nx+1])
     dyq = np.zeros([ny+1,nx+1])
-    
+
     j1d = np.empty([0])
     for j in range(0,ny+1):
         j_s = b*j + a*(j+1)
-        if(j_s[-1]==ny): j_s[-1]=ny-0.001 #avoid phi=90 as this will cause errore. 
-                                          #Niki:Find a way to avoid this properly. 
-                                          #This could be a sign that there is still something  
+        if(j_s[-1]==ny): j_s[-1]=ny-0.001 #avoid phi=90 as this will cause errore.
+                                          #Niki:Find a way to avoid this properly.
+                                          #This could be a sign that there is still something
                                           #wrong with the h_j_inv calculations at phi=90 (beta=0).
         j1d = np.append(j1d,j_s)
 
@@ -160,10 +160,10 @@ def bipolar_cap_metrics_quad_fast(order,nx,ny,lat0_bp,lon_bp,rp,Re=_default_Re):
             daq[j,i] = quad_average_2d(dxdy_r[j,:,i,:])
             dxq[j,i] = quad_average(dx_r[j,0,i,:])
             dyq[j,i] = quad_average(dy_r[j,:,i,0])
-    daq = daq[:-1,:-1]*Re*Re   
+    daq = daq[:-1,:-1]*Re*Re
     dxq = dxq[:,:-1]  *Re
     dyq = dyq[:-1,:]  *Re
-    return dxq,dyq,daq       
+    return dxq,dyq,daq
 
 def quad_positions(n=3):
     """Returns weights wa and wb so that the element [xa,xb] is sampled at positions
@@ -196,25 +196,25 @@ def quad_average(y):
         d = 1. / 180.
         return d * ( 64.* y[2] + ( 49. * ( y[1] + y[3] ) )  + 9. * ( y[0] + y[4] ) )
     raise Exception('Uncoded order')
-    
+
 def quad_average_2d(y):
     """Returns the average value found by quadrature at order n.
     y is a list of values in order from x1=-1 to x1=1 and x2=-1 to x2=1."""
     if y.shape[0] != y.shape[1]:
         raise Exception('Input array is not squared!')
-        
+
     if y.shape[0]==2: # 1, 1
         d = 1./2.
         return d * d * ( y[0,0] + y[0,1] + y[1,0] + y[1,1] )
     if y.shape[0]==3: # 1/3, 4/3, 1/3
         d = 1./6.
-        return d * d * ( y[0,0]+y[0,2]+y[2,0]+y[2,2] +4.*(y[0,1]+y[1,0]+y[1,2]+y[2,1] + 4.*y[1,1])) 
+        return d * d * ( y[0,0]+y[0,2]+y[2,0]+y[2,2] +4.*(y[0,1]+y[1,0]+y[1,2]+y[2,1] + 4.*y[1,1]))
     if y.shape[0]==4: # 1/6, 5/6, 5/6, 1/6
         d = 1. / 12.
 #       return d * ( 5. * ( y[1] + y[2] ) + ( y[0] + y[3] ) )
         w = np.array([1.,5.,5.,1.])
         ysum=0.
-        for j in range(0,y.shape[0]): 
+        for j in range(0,y.shape[0]):
             for i in range(0,y.shape[1]):
                 ysum = ysum+ w[i]*w[j]*y[j,i]
         return d * d * ysum
@@ -223,11 +223,11 @@ def quad_average_2d(y):
         #return d * ( 64.* y[2] + ( 49. * ( y[1] + y[3] ) )  + 9. * ( y[0] + y[4] ) )
         w = np.array([9.,49.,64.,49.,9.])
         ysum=0.
-        for j in range(0,y.shape[0]): 
+        for j in range(0,y.shape[0]):
             for i in range(0,y.shape[1]):
                 ysum = ysum+ w[i]*w[j]*y[j,i]
         return d * d * ysum
-    
+
     raise Exception('Uncoded order')
 
 def lagrange_interp(x,y,q):
@@ -264,7 +264,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
     #Ensure that the equator (y=0) is a u-point
     if(y_star[0]%2 == 0):
         print("  *Equator may not be a u-point!")
-        #There is another check for this for the whole grid. 
+        #There is another check for this for the whole grid.
         if(shift_equator_to_u_point):
             print("  *Fixing this by shifting the bounds!")
             y_star[0] = y_star[0] - 1
@@ -277,12 +277,12 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
             y_star[1] = y_star[1] - 1
     Nj=y_star[1]-y_star[0]
     print( '   Generating Mercator grid with phi range: phi_s,phi_n=', phi_mercator(Ni, y_star) )
-    phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1)) 
+    phi_M = phi_mercator(Ni, np.arange(y_star[0],y_star[1]+1))
 
     #Ensure that the equator (y=0) is included and is a u-point
     equator=0.0
     equator_index = np.searchsorted(phi_M,equator)
-    if(equator_index == 0): 
+    if(equator_index == 0):
         raise Exception('   Ooops: Equator is not in the grid')
     else:
         print("   Equator is at j=", equator_index)
@@ -292,13 +292,13 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
 
     if(enhanced_equatorial):
         print ('   Enhancing the equator region resolution')
-        #Enhance the lattitude resolution between 30S and 30N 
-        #Set a constant high res lattitude grid spanning 10 degrees centered at the Equator. 
+        #Enhance the lattitude resolution between 30S and 30N
+        #Set a constant high res lattitude grid spanning 10 degrees centered at the Equator.
         #This construction makes the whole Mercator subgrid symmetric around the Equator.
         #
         #Free MIDAS parameters. Where does this come from and how should it change with resolution?
-        phi_enh_d =-5. #Starting lattitude of enhanced resolution grid 
-        phi_cub_d =-30 #Starting lattitude of cubic interpolation 
+        phi_enh_d =-5. #Starting lattitude of enhanced resolution grid
+        phi_cub_d =-30 #Starting lattitude of cubic interpolation
 
         N_cub=132   *refineR/2 #Number of points in the cubic interpolation for one shoulder
                                #MIDAS has 130, but 132 produces a result closer to 1/2 degree MIDAS grid
@@ -310,7 +310,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
         dphi = phi_M[1:]-phi_M[0:-1]
 
         cubic_lagrange_interp = True
-        cubic_scipy = False 
+        cubic_scipy = False
 
         phi1 = phi_M[0:j_phi_cub_d]
         phi_s = phi_M[j_phi_cub_d-1]
@@ -320,10 +320,10 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
         nodes = [0,1,N_cub-2,N_cub-1]
         phi_nodes = [phi_s,phi_s+dphi_s,phi_e-dphi_e,phi_e]
         q=np.arange(N_cub)
-        
+
         if(cubic_lagrange_interp):
             phi2 = lagrange_interp(nodes,phi_nodes,q)
-        elif(cubic_scipy): #MIDAS 
+        elif(cubic_scipy): #MIDAS
             import scipy.interpolate
             f2=scipy.interpolate.interp1d(nodes,phi_nodes,kind='cubic')
             jInd2=np.arange(N_cub, dtype=float)
@@ -345,10 +345,10 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
         j_phi_n = np.where(phi_M<phi_n)[0][-1]  #The last index with phi_M<phi_n
         phi_M = phi_M[0:j_phi_n]
         Nj = phi_M.shape[0]-1
-   
+
     y_grid_M = np.tile(phi_M.reshape(Nj+1,1),(1,Ni+1))
     lam_M = lon0_M + np.arange(Ni+1) * lenlon_M/float(Ni)
-    x_grid_M = np.tile(lam_M,(Nj+1,1)) 
+    x_grid_M = np.tile(lam_M,(Nj+1,1))
     #Double check is necessary for enhanced_equatorial
     if(y_grid_M.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
@@ -361,7 +361,7 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
 
 ###
 #Displaced pole cap functions
-###                                
+###
 def displacedPoleCap_projection(lon_grid,lat_grid,z_0,r_joint):
     r = np.tan((90+lat_grid) *PI_180)/r_joint
     #Find the theta that has matching resolution at the unit circle with longitude at the joint
@@ -383,18 +383,18 @@ def displacedPoleCap_projection(lon_grid,lat_grid,z_0,r_joint):
     rw=np.absolute(w)
     phicDP = -90+np.arctan(rw*r_joint)/PI_180
     return lamcDP,phicDP
-    
+
 def monotonic_bounding(x,x_0):
     x_im1= x[:,0]*0 + x_0 #Initial value
     for i in range(0,x.shape[1]):
         x[:,i]=np.where(x[:,i]-x_im1[:] > 100, x[:,i]-360, x[:,i])
-        x_im1[:] = x[:,i]  
+        x_im1[:] = x[:,i]
     return x
-    
+
 def displacedPoleCap_baseGrid(i,j,ni,nj,lon0,lat0):
     u = lon0  + i * 360./float(ni)
     a=-90.
-    b=lat0 
+    b=lat0
     v=a + j * (b-a)/float(nj)
     du=np.roll(u,shift=-1,axis=0)-u
     dv=np.roll(v,shift=-1,axis=0)-v
@@ -403,15 +403,15 @@ def displacedPoleCap_baseGrid(i,j,ni,nj,lon0,lat0):
 def displacedPoleCap_mesh(i,j,ni,nj,lon0,lat0,lam_pole,r_pole,excluded_fraction=None):
 
     long,latg,du,dv = displacedPoleCap_baseGrid(i,j,ni,nj,lon0,lat0)
-    lamg = np.tile(long,(latg.shape[0],1)) 
+    lamg = np.tile(long,(latg.shape[0],1))
     phig = np.tile(latg.reshape((latg.shape[0],1)),(1,long.shape[0]))
     #Projection from center of globe to plane tangent at south pole
-    r_joint = np.tan((90+lat0)*PI_180) 
-    z_0= r_pole * (np.cos(lam_pole*PI_180)+1j*np.sin(lam_pole*PI_180)) 
+    r_joint = np.tan((90+lat0)*PI_180)
+    z_0= r_pole * (np.cos(lam_pole*PI_180)+1j*np.sin(lam_pole*PI_180))
     lams,phis = displacedPoleCap_projection(lamg,phig,z_0,r_joint)
 
     if excluded_fraction is not None:
-        ny,nx = lamg.shape 
+        ny,nx = lamg.shape
         jmin=np.ceil(excluded_fraction*ny)
         jmin=jmin+np.mod(jmin,2)
         jmint = int(jmin)
@@ -442,7 +442,7 @@ def great_arc_distance(j0, i0, j1, i1, nx,ny ,lon0,lat0,lon_dp,r_dp):
 
 def numerical_hi(j, i, nx,ny ,lon0,lat0,lon_dp,r_dp, eps, order=6):
     """Returns a numerical approximation to h_lambda"""
-    reps = 1. / eps 
+    reps = 1. / eps
     ds2 = great_arc_distance(j, i+eps, j, i-eps, nx,ny ,lon0,lat0,lon_dp,r_dp)
     if order == 2: return 0.5 * ds2 * reps
     ds4 = great_arc_distance(j, i+2.*eps, j, i-2.*eps, nx,ny ,lon0,lat0,lon_dp,r_dp)
@@ -453,7 +453,7 @@ def numerical_hi(j, i, nx,ny ,lon0,lat0,lon_dp,r_dp, eps, order=6):
 
 def numerical_hj(j, i, nx,ny ,lon0,lat0,lon_dp,r_dp, eps, order=6):
     """Returns a numerical approximation to h_phi"""
-    reps = 1. / eps 
+    reps = 1. / eps
     ds2 = great_arc_distance(j+eps, i, j-eps, i, nx,ny ,lon0,lat0,lon_dp,r_dp)
     if order == 2: return 0.5 * ds2 * reps
     ds4 = great_arc_distance(j+2.*eps, i, j-2.*eps, i, nx,ny ,lon0,lat0,lon_dp,r_dp)
@@ -471,12 +471,12 @@ def displacedPoleCap_metrics_quad(order,nx,ny,lon0,lat0,lon_dp,r_dp,Re=_default_
     dyq = np.zeros([ny+1,nx+1])
 
     j1d = np.empty([0])
-    for j in range(0,ny+1):  
+    for j in range(0,ny+1):
         j_s = b*j + a*(j+1)
         j1d = np.append(j1d,j_s)
 
     i1d = np.empty([0])
-    for i in range(0,nx+1):  
+    for i in range(0,nx+1):
         i_s = b*i + a*(i+1)
         i1d = np.append(i1d,i_s)
     #numerical approximation to h_i_in and h_j_inv at quadrature points
@@ -488,17 +488,17 @@ def displacedPoleCap_metrics_quad(order,nx,ny,lon0,lat0,lon_dp,r_dp,Re=_default_
     #area element
     dxdy_r = dx_r*dy_r
 
-    for j in range(0,ny+1):  
+    for j in range(0,ny+1):
         for i in range(0,nx+1):
             daq[j,i] = quad_average_2d(dxdy_r[j,:,i,:])
             dxq[j,i] = quad_average(dx_r[j,0,i,:])
             dyq[j,i] = quad_average(dy_r[j,:,i,0])
 
-    daq = daq[:-1,:-1]*Re*Re   
+    daq = daq[:-1,:-1]*Re*Re
     dxq = dxq[:,:-1]  *Re
     dyq = dyq[:-1,:]  *Re
 
-    return dxq,dyq,daq    
+    return dxq,dyq,daq
 
 def cut_below(lam,phi,lowerlat):
     nj,ni = lam.shape
@@ -533,15 +533,15 @@ def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig
     if title is not None:
         plt.title(title)
 #    plt.show()
-        
+
 def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None):
     if lowerlat is not None:
-        lam,phi = cut_below(lam,phi,lowerlat=lowerlat)        
+        lam,phi = cut_below(lam,phi,lowerlat=lowerlat)
     if upperlat is not None:
-        lam,phi = cut_above(lam,phi,upperlat=upperlat)        
+        lam,phi = cut_above(lam,phi,upperlat=upperlat)
     x = np.cos(phi*PI_180) * np.cos(lam*PI_180)
     y = np.cos(phi*PI_180) * np.sin(lam*PI_180)
-    z = np.sin(phi*PI_180)        
+    z = np.sin(phi*PI_180)
     plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title)
 
 def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0_SO, stride=40,block=False):
@@ -604,9 +604,9 @@ def generate_grid_metrics_MIDAS(x,y,axis_units='degrees',Re=_default_Re, latlon_
     nytot,nxtot = x.shape
     if  axis_units == 'm':
       metric=1.0
-    if  axis_units == 'km':            
+    if  axis_units == 'km':
       metric=1.e3
-    if  axis_units == 'degrees':                        
+    if  axis_units == 'degrees':
       metric=Re*PI_180
     lv = ( 0.5 * ( y[:,1:] + y[:,:-1] ) ) * PI_180
     dx_i = mdist( x[:,1:], x[:,:-1] ) * PI_180
@@ -618,7 +618,7 @@ def generate_grid_metrics_MIDAS(x,y,axis_units='degrees',Re=_default_Re, latlon_
     dy = Re * np.sqrt( dy_j**2 + (dx_j*np.cos(lu))**2 )
 
     ymid_j = 0.5*(y+np.roll(y,shift=-1,axis=0))
-    ymid_i = 0.5*(y+np.roll(y,shift=-1,axis=1))      
+    ymid_i = 0.5*(y+np.roll(y,shift=-1,axis=1))
     dy_j = np.roll(y,shift=-1,axis=0) - y
     dy_i = np.roll(y,shift=-1,axis=1) - y
     dx_i = mdist(np.roll(x,shift=-1,axis=1),x)
@@ -658,12 +658,12 @@ def metrics_error(dx_,dy_,area_,Ni,lat1,lat2=90,Re=_default_Re,bipolar=False,dis
         #This must be 4*grid_lat_arc_length
         lon_arc2_error = 100*(grid_lon_arc_length2/4 - exact_lat_arc_length)/exact_lat_arc_length
     area_error = 100*(np.sum(area_)-exact_area)/exact_area
-    lat_arc_error = 100*(grid_lat_arc_length - exact_lat_arc_length)/exact_lat_arc_length    
+    lat_arc_error = 100*(grid_lat_arc_length - exact_lat_arc_length)/exact_lat_arc_length
     lon_arc_error = 100*(grid_lon_arc_length -  exact_lon_arc_length)/exact_lon_arc_length
     if(displaced_pole != -999):
         antipole=displaced_pole+Ni//2
         if(displaced_pole>Ni//2):
-            antipole=displaced_pole-Ni//2 
+            antipole=displaced_pole-Ni//2
         grid_lat_arc_length = np.sum(dy_[:,displaced_pole]) + np.sum(dy_[:,antipole])
         lat_arc_error = 100*(grid_lat_arc_length - 2.*exact_lat_arc_length)/exact_lat_arc_length
     if(excluded_fraction):
@@ -696,10 +696,10 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     nxp=fout.createDimension('nxp',nxp)
     ny=fout.createDimension('ny',ny)
     nx=fout.createDimension('nx',nx)
-    string=fout.createDimension('string',255)    
+    string=fout.createDimension('string',255)
     tile=fout.createVariable('tile','S1',('string'))
     yv=fout.createVariable('y','f8',('nyp','nxp'))
-    xv=fout.createVariable('x','f8',('nyp','nxp'))    
+    xv=fout.createVariable('x','f8',('nyp','nxp'))
     yv.units='degrees'
     xv.units='degrees'
     yv[:]=y
@@ -736,10 +736,10 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
     if(llatSP.shape[0]%2 == 0 and ensure_nj_even):
         print("   The number of j's is not even. Fixing this by cutting one row at south.")
         llatSP = np.delete(llatSP,0,0)
-    
-    llamSP = np.tile(llonSP,(llatSP.shape[0],1)) 
+
+    llamSP = np.tile(llonSP,(llatSP.shape[0],1))
     lphiSP = np.tile(llatSP.reshape((llatSP.shape[0],1)),(1,llonSP.shape[0]))
-    
+
     print('   generated regular lat-lon grid between latitudes ', lphiSP[0,0],lphiSP[-1,0])
     print('   number of js=',lphiSP.shape[0])
 
@@ -754,7 +754,7 @@ def generate_latlon_grid(lni,lnj,llon0,llen_lon,llat0,llen_lat, ensure_nj_even=T
 
 def usage():
     print('ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --reproduce_MIDAS_grids --match_dy --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --gridlist=sc]')
- 
+
 
 def main(argv):
 
@@ -784,7 +784,7 @@ def main(argv):
         print(err)
         usage()
         sys.exit(2)
-        
+
     for opt, arg in opts:
         if opt == '-h':
             usage()
@@ -839,16 +839,16 @@ def main(argv):
         hist = hist + " on "+ str(datetime.date.today()) + " on platform "+ host
 
     desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
-    
+
     source =""
     if(not no_changing_meta):
-        source =  source + scriptpath + " had git hash " + scriptgithash + scriptgitMod 
+        source =  source + scriptpath + " had git hash " + scriptgithash + scriptgitMod
         source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
 
-    
+
     # Specify the default grid properties
     refineS=2 # factor 2 is for supergrid
-    refineR=degree_resolution_inverse   
+    refineR=degree_resolution_inverse
     lenlon=360  # global longitude range
     lon0=-300.  # Starting longitude of the map
     Ni=int(refineR*refineS* lenlon)
@@ -867,9 +867,9 @@ def main(argv):
     #Southern Ocean grid
     ###
     lat0_SO=-78. #Starting lat of Southern Ocean grid
-    lenlat_SO = phi_s_Merc-lat0_SO    
+    lenlat_SO = phi_s_Merc-lat0_SO
     deltaPhiSO = 1.0/refineR/refineS
-    #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
+    #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS
     Nj_SO  =int(refineR*  55)
     if(refineR == 2):
         Nj_SO = 54*refineS+1
@@ -877,25 +877,25 @@ def main(argv):
     #Bipolar cap
     ###
     lon_bp=lon0 # longitude of the bipole(s)
-    #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS   
+    #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS
     Nj_ncap = int(60*refineR*refineS)
     if(refineR == 2):
-        Nj_ncap = 119*refineS  
+        Nj_ncap = 119*refineS
     ###
     #South cap
     ###
-    #To get the same number of points as existing 1/4 degree grids that were generated with MIDAS   
+    #To get the same number of points as existing 1/4 degree grids that were generated with MIDAS
     Nj_scap = int(refineR *  40)
     #Refine the grid by a factor and then exclude the inner circle corresponding to that factor
-    #These factors are heuristic and we adjust them to get a grid with the same number of points 
+    #These factors are heuristic and we adjust them to get a grid with the same number of points
     #as the existing 1/4 degree grid of OM4p25
     Nj_scap = Nj_scap *7//4
     doughnut = 0.28 *7/4
     lat0_SC=lat0_SO
- 
+
     if("mercator" in grids or "all" in grids):
         if(not reproduce_MIDAS_grids):
-            lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR,shift_equator_to_u_point=shift_equator_to_u_point, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)  
+            lamMerc,phiMerc = generate_mercator_grid(Ni,phi_s_Merc,phi_n_Merc,lon0,lenlon, refineR,shift_equator_to_u_point=shift_equator_to_u_point, ensure_nj_even=ensure_nj_even,enhanced_equatorial=enhanced_equatorial)
             angleMerc = angle_x(lamMerc,phiMerc)
             dxMerc  =-np.ones([lamMerc.shape[0],lamMerc.shape[1]-1])
             dyMerc  =-np.ones([lamMerc.shape[0]-1,lamMerc.shape[1]])
@@ -904,13 +904,13 @@ def main(argv):
                 #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                 dxMerc,dyMerc,areaMerc = generate_grid_metrics_MIDAS(lamMerc,phiMerc)
                 print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxMerc,dyMerc,areaMerc,Ni,phiMerc[0,0],phiMerc[-1,0]))
-        else: #use pymidas package   
-            from pymidas.rectgrid_gen import supergrid        
+        else: #use pymidas package
+            from pymidas.rectgrid_gen import supergrid
             if(refineR == 2):
                 Nj_Merc    = 364*refineS
                 phi_s_Merc  = -70.0  # This is a nominal starting latitude for Mercator grid
                 lenlat_Merc= 135.0  # nominal latitude range of Mercator grid
-            elif(refineR == 4):    
+            elif(refineR == 4):
                 Nj_Merc    = 700*refineS
                 phi_s_Merc  = -65.0  # This is a nominal starting latitude for Mercator grid
                 lenlat_Merc= 125.0  # nominal latitude range of Mercator grid
@@ -961,12 +961,12 @@ def main(argv):
                 jind2=jind2+np.mod(jind2,2)
                 PHI2=PHI[jind:jind2-1]
                 x,y = np.meshgrid(LAMBDA,PHI2)
-                mercator = supergrid(xdat=x,ydat=y,axis_units='degrees',cyclic_x=True)            
+                mercator = supergrid(xdat=x,ydat=y,axis_units='degrees',cyclic_x=True)
 
             print ("mercator.y.shape= ",mercator.y.shape)
             print ("mercator max/min latitude=", mercator.y.max(),mercator.y.min())
             print ("mercator start/end longitude=",mercator.x[0,0],mercator.x[0,-1])
-            print ("mercator start/end latitudes=",mercator.y[0,0],mercator.y[-1,0])       
+            print ("mercator start/end latitudes=",mercator.y[0,0],mercator.y[-1,0])
             mercator.grid_metrics()
             lamMerc,phiMerc = mercator.x,mercator.y
             dxMerc,dyMerc,areaMerc,angleMerc =mercator.dx,mercator.dy,mercator.area,mercator.angle_dx
@@ -992,17 +992,17 @@ def main(argv):
             #behavior for middle points.
             #Note that int(0.5+x) is equivalent to math.floor(0.5+x)
             Nj_ncap = int(0.5+ (90.-lat0_bp)/DeltaPhiMerc_no) #Impose boundary condition for smooth dy
-            
-            
+
+
             #Make the last SO grid point a (Mercator) step below the first Mercator lattitude.
             #lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
-            #Niki: I think this is wrong! 
+            #Niki: I think this is wrong!
             #The SO grid should end at the same lattitude that Mercator starts.
             #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
             #This way we get a continous dy and area.
             lenlat_SO = phiMerc[0,Ni//4] - lat0_SO
-            #Determine the number of grid point in the y direction such that the y resolution is equal to 
-            #(continuous with) the first Mercator dy.     
+            #Determine the number of grid point in the y direction such that the y resolution is equal to
+            #(continuous with) the first Mercator dy.
             Nj_SO = int(0.5 + lenlat_SO/DeltaPhiMerc_so) #Make the resolution continious with the Mercator at joint
 
     ###
@@ -1012,16 +1012,16 @@ def main(argv):
         if(not reproduce_MIDAS_grids):
             #Generate the bipolar grid
             lamBP,phiBP,dxBP_h,dyBP_h = generate_bipolar_cap_mesh(Ni,Nj_ncap,lat0_bp,lon_bp, ensure_nj_even=ensure_nj_even)
-            #Metrics via quadratue of h's 
+            #Metrics via quadratue of h's
             rp=np.tan(0.5*(90-lat0_bp)*PI_180)
             dxBP  =-np.ones([lamBP.shape[0],lamBP.shape[1]-1])
             dyBP  =-np.ones([lamBP.shape[0]-1,lamBP.shape[1]])
             areaBP=-np.ones([lamBP.shape[0]-1,lamBP.shape[1]-1])
             if(calculate_metrics):
-                dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp) 
+                dxBP,dyBP,areaBP = bipolar_cap_metrics_quad_fast(5,phiBP.shape[1]-1,phiBP.shape[0]-1,lat0_bp,lon_bp,rp)
                 print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc1, lon arc2)", metrics_error(dxBP,dyBP,areaBP,Ni,lat0_bp,90.,bipolar=True))
             angleBP = angle_x(lamBP,phiBP)
-        else:           
+        else:
             lat0_bp=mercator.y.max()
             dlat=90.0-lat0_bp
 
@@ -1052,8 +1052,8 @@ def main(argv):
                 #For spherical grids we can safely use the MIDAS algorithm for calculating the metrics
                 dxSO,dySO,areaSO = generate_grid_metrics_MIDAS(lamSO,phiSO)
             angleSO=angle_x(lamSO,phiSO)
-            print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))       
-        else:            
+            print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSO,dySO,areaSO,Ni,phiSO[0,0],phiSO[-1,0]))
+        else:
             print ('constructing a spherical supergrid with (ny,nx) = ',Ni,Nj_SO)
             print ('nominal starting lat and starting longitude =',lat0_SO, lon0)
             print ('and nominal width in latitude = ',mercator.y.min()-lat0_SO)
@@ -1072,7 +1072,7 @@ def main(argv):
 
         deltaPhiSO = phiSO[1,Ni//4]-phiSO[0,Ni//4]
         lat0_SC=phiSO[0,Ni//4]-deltaPhiSO
-        #The above heuristics produce a displaced pole grid with a nominal resolution 
+        #The above heuristics produce a displaced pole grid with a nominal resolution
         #different from the rest of the grid!
         #To get the nominal resolution right  we must instead make the resolution continuous across the joint
         #fullArc = lat0_SC+90.
@@ -1132,13 +1132,13 @@ def main(argv):
                 dySC  =-np.ones([lamSC.shape[0]-1,lamSC.shape[1]])
                 areaSC=-np.ones([lamSC.shape[0]-1,lamSC.shape[1]-1])
                 if(calculate_metrics):
-                    dxSC,dySC,areaSC = displacedPoleCap_metrics_quad(4,Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)   
+                    dxSC,dySC,areaSC = displacedPoleCap_metrics_quad(4,Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)
                     poles_i=int(Ni*np.mod(lon_dp-lon0,360)/360.)
                     print("   CHECK_metrics_hquad: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,lat1=lat0_SC, lat2=-90.,displaced_pole=poles_i,excluded_fraction=doughnut))
                 #Compare with MIDAS metrics
                 #dxSC_MIDAS,dySC_MIDAS,areaSC_MIDAS = generate_grid_metrics_MIDAS(lamSC,phiSC)
-                #print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))            
-                
+                #print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
+
                 #Cut the unused portion of the grid
                 #Choose the doughnut factor to keep the number of j's the same as in existing OM4p25 grid
                 if(doughnut != 0.0):
@@ -1151,7 +1151,7 @@ def main(argv):
                     dySC  = dySC[jmint:,:]
                     areaSC= areaSC[jmint:,:]
                     angleSC=angleSC[jmint:,:]
-                
+
                 if(phiSC.shape[0]%2 == 0 and ensure_nj_even):
                     print("   The number of j's is not even. Fixing this by cutting one row at south.")
                     lamSC = np.delete(lamSC,0,0)
@@ -1160,9 +1160,9 @@ def main(argv):
                     dySC  = np.delete(dySC,0,0)
                     areaSC= np.delete(areaSC,0,0)
                     angleSC= np.delete(angleSC,0,0)
-               
+
                 print('   number of js=',lamSC.shape[0])
-            else:    
+            else:
                 ny_scap = int(refineR *  40)
                 r0_pole = 0.20
                 lon0_pole=100.0 # 180-longitude of the displaced pole
@@ -1174,7 +1174,7 @@ def main(argv):
                 y=np.linspace(-90.,0.5*(lat0_SO-90.0),ny_scap/8)
                 y=np.concatenate((y,np.linspace(y.max(),lat0_SO,7*ny_scap/8+1)))
                 X,Y=np.meshgrid(x,y)
-                antarctic_cap=supergrid(xdat=X,ydat=Y,axis_units='degrees',displace_pole=True,r0_pole=r0_pole,lon0_pole=lon0_pole,doughnut=doughnut)                  
+                antarctic_cap=supergrid(xdat=X,ydat=Y,axis_units='degrees',displace_pole=True,r0_pole=r0_pole,lon0_pole=lon0_pole,doughnut=doughnut)
                 antarctic_cap.grid_metrics()
                 print( "generated a southern cap of size (ny,nx)= ",antarctic_cap.y.shape[0]-1,antarctic_cap.y.shape[1]-1)
 
@@ -1192,17 +1192,17 @@ def main(argv):
         #to have the right shape.
         #But y and area have a shape[0]=ny and should not be cut.
         #Niki: This cut can be done in a few ambigous ways:
-        #    1.  MIDAS way (above) 
-        #    2.  this way  : x1=np.concatenate((lamSC[:-1,:],lamSO),axis=0) 
+        #    1.  MIDAS way (above)
+        #    2.  this way  : x1=np.concatenate((lamSC[:-1,:],lamSO),axis=0)
         #                    y1=np.concatenate((phiSC[:-1,:],phiSO),axis=0)
         #                    dx1=np.concatenate((dxSC[:-1,:],dxSO),axis=0)
         #                    angle1=np.concatenate((angleSC[:-1,:],angleSO),axis=0)
         #                    #
         #                    dy1=np.concatenate((dySC,dySO),axis=0)
         #                    area1=np.concatenate((areaSC,areaSO),axis=0)
-        #     3.  at the very end by restricting to x3[2:,:], ... 
+        #     3.  at the very end by restricting to x3[2:,:], ...
         #      Which way is "correct"?
-        #      If the sub-grids are disjoint, 1 and 2 introduce a jump in y1 at the joint, 
+        #      If the sub-grids are disjoint, 1 and 2 introduce a jump in y1 at the joint,
         #      as a result y1 and dy1 may become inconsistent?
         #
         hasSC=True
@@ -1233,7 +1233,7 @@ def main(argv):
                     dySC = dySC[jcut:,:]
                     areaSC = areaSC[jcut:,:]
                     angleSC = angleSC[jcut:,:]
-                else: 
+                else:
                     print("   Whole SC and some of SO need to be cut!")
                     print("   SO: shape[0], jcut",lamSO.shape[0],jcut)
                     hasSC=False
@@ -1342,13 +1342,13 @@ def main(argv):
         if(plotem):
             displacedPoleCap_plot (lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10))
             displacedPoleCap_plot2(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
-           
 
-        #write the whole grid file    
+
+        #write the whole grid file
         desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "
 
         desc = desc + "It is capped by a "
-        if(r_dp != 0.0): 
+        if(r_dp != 0.0):
             desc = desc + "displaced pole "
         else:
             desc = desc + "regular "
@@ -1363,7 +1363,7 @@ def main(argv):
         #Ensure that the equator (y=0) is still a u-point
         equator=0.0
         equator_index = np.searchsorted(y3[:,Ni//4],equator)
-        if(equator_index == 0): 
+        if(equator_index == 0):
             raise Exception('   Ooops: Equator is not in the grid')
         else:
             print("   Equator is at j=", equator_index)
@@ -1371,19 +1371,18 @@ def main(argv):
         if(equator_index%2 == 0):
             raise Exception("Ooops: Equator is not going to be a u-point. Use option --south_cutoff_row to one more or on less row from south.")
         if(y3.shape[0]%2 == 0):
-            raise Exception("Ooops: The number of j's in the supergrid is not even. Use option --south_cutoff_row to one more or on less row from south.") 
+            raise Exception("Ooops: The number of j's in the supergrid is not even. Use option --south_cutoff_row to one more or on less row from south.")
         if(not reproduce_MIDAS_grids):
             write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
         else:
             write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,format='NETCDF3_CLASSIC',description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
 
         print("Wrote the whole grid to file ",gridfilename)
-    
+
         #Visualization
         if(plotem):
             plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
-            plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees") 
+            plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
 
 if __name__ == "__main__":
    main(sys.argv[1:])
-

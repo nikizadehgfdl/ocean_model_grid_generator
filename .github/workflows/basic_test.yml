@@ -1,0 +1,20 @@
+name: basic tests
+
+on: [push, pull_request]
+
+jobs:
+  basictests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '>=3.6'
+    - name: Install pytest
+      run: python3 -m pip install pytest
+    - name: Install numpypi
+      run: python3 -m pip install git+https://github.com/adcroft/numpypi.git
+    - name: Install netCDF4
+      run: python3 -m pip install netCDF4
+    - name: numpypi series test
+      run: pytest -v
