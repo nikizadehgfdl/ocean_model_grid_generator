@@ -421,7 +421,7 @@ def displacedPoleCap_mesh(i,j,ni,nj,lon0,lat0,lam_pole,r_pole,excluded_fraction=
 
 def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lat0,lon_dp,r_dp):
     print( 'Generating displaced pole grid bounded at latitude ',lat0  )
-    print('   rdp=',r_dp)
+    print('   rdp=',r_dp,' londp=',lon_dp)
     i_s=np.arange(Ni+1)
     j_s=np.arange(Nj_scap+1)
     x,y= displacedPoleCap_mesh(i_s,j_s,Ni,Nj_scap,lon0,lat0,lon_dp,r_dp)
@@ -761,8 +761,8 @@ def main(argv):
     degree_resolution_inverse = 4 # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
     south_cap = True
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
-    r_dp=0.0
-    lon_dp=0.0
+    r_dp=0.0      # r value   of the displaced pole
+    lon_dp=80.0   # longitude of the displaced pole
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
@@ -779,7 +779,7 @@ def main(argv):
     shift_equator_to_u_point=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -801,6 +801,8 @@ def main(argv):
             south_cutoff_row = int(arg)
         elif opt in ("--rdp"):
              r_dp = float(arg)
+        elif opt in ("--londp"):
+             lon_dp = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
         elif opt in ("--match_dy"):
@@ -1114,7 +1116,6 @@ def main(argv):
                 print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
         else:
             if(not reproduce_MIDAS_grids):
-                lon_dp=80.0   # longitude of the displaced pole
                 if(match_dy):
                     #The SC grid should end at the same lattitude that SO starts.
                     #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
@@ -1182,6 +1183,38 @@ def main(argv):
                 dxSC,dySC,areaSC,angleSC =antarctic_cap.dx,antarctic_cap.dy,antarctic_cap.area,antarctic_cap.angle_dx
 
                 print("   CHECK_metrics_MIDAS: % errors in (area, lat arc, lon arc)", metrics_error(dxSC,dySC,areaSC,Ni,phiSC[-1,0],phiSC[0,0]))
+
+        if(not "all" in grids): #if only "sc" was requested cut it according to args
+            #Cut the grid at south according to the options!
+            #We may need to cut the whole SC grid and some of the SO
+            cut=False
+            jcut=0
+            cats=0
+            if(south_cutoff_row > 0):
+                cut=True
+                jcut = south_cutoff_row - 1
+            elif(south_cutoff_ang > -90):
+                cut=True
+                jcut = 1 + np.nonzero(phiSC[:,0] < south_cutoff_ang)[0][-1]
+
+            if(cut):
+                print("   SC: shape[0], jcut",lamSC.shape[0],jcut)
+                if(jcut<lamSC.shape[0]): #only SC needs to be cut
+                    if((phiSC.shape[0]-jcut)%2 == 0 and ensure_nj_even):
+                    #if((areaSC.shape[0]-jcut-1)%2 == 0 and ensure_nj_even):
+                        print("   SC: The number of j's is not even. Fixing this by cutting one row at south.")
+                        jcut = jcut+1
+                    print("   Cutting SC grid rows 0 to ", jcut)
+                    lamSC = lamSC[jcut:,:]
+                    phiSC = phiSC[jcut:,:]
+                    dxSC = dxSC[jcut:,:]
+                    dySC = dySC[jcut:,:]
+                    areaSC = areaSC[jcut:,:]
+                    angleSC = angleSC[jcut:,:]           
+
+
+        if(write_subgrid_files):
+            write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
 
     if("all" in grids):
         #Concatenate to generate the whole grid
