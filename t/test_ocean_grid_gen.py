@@ -59,8 +59,8 @@ class TestOGG():
   def test_hgrid_res0_125(self, tmpdir):
     outfile = tmpdir.join('ocean_hgrid_res0.125.nc')
     sp = subprocess.run([ogg_cmd,
-                         '-f', outfile, '-r', '4', '--rdp', '0.2',
+                         '-f', outfile, '-r', '8', '--rdp', '0.2',
                          '--south_cutoff_row', '5', '--match_dy', '--even_j',
                          '--write_subgrid_files', '--no_changing_meta'])
     assert sp.returncode == 0
-    assert hashfile(outfile) == 'b1989adc7d7ae88da19aef546eebb2c96a1ad04202d2d1e3c3efd82aa3d693da'
+    assert hashfile(outfile) == 'a5a5c859464aecda946a8d43ab238256fe26c5bec546a2d8d533de221276a63f'
