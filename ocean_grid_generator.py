@@ -304,6 +304,14 @@ def generate_mercator_grid(Ni,phi_s,phi_n,lon0_M,lenlon_M,refineR,shift_equator_
                                #MIDAS has 130, but 132 produces a result closer to 1/2 degree MIDAS grid
         dphi_e=0.13 *2/refineR #Enhanced resolution 10 degrees around the equator
         N_enh=40    *refineR/2 #Number of points in the enhanced resolution below equator
+        
+        if(refineR == 1): #Closest to SPEAR grid
+          phi_enh_d =-10
+          phi_cub_d =-20
+          N_cub=28
+          #dphi_e=0.18
+          N_enh=56
+          dphi_e=-phi_enh_d/N_enh
 
         j_c0d = np.where(phi_M<phi_enh_d)[0][-1] #The last index with phi_M<phi_enh_d
         j_phi_cub_d = np.where(phi_M<phi_cub_d)[0][-1]  #The last index with phi_M<phi_cub_d
@@ -865,6 +873,9 @@ def main(argv):
         #phi_s_Merc, phi_n_Merc = -68.05725376601046, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
         #shift_equator_to_u_point= False
         phi_s_Merc, phi_n_Merc = -68.0, 65.0
+    if(refineR == 1): #Closest to SPEAR grid
+        #shift_equator_to_u_point=True
+        phi_s_Merc, phi_n_Merc = -77.8, 60.
     ###
     #Southern Ocean grid
     ###
@@ -875,6 +886,8 @@ def main(argv):
     Nj_SO  =int(refineR*  55)
     if(refineR == 2):
         Nj_SO = 54*refineS+1
+    if(refineR == 1):
+        Nj_SO = 0
     ###
     #Bipolar cap
     ###
@@ -883,11 +896,15 @@ def main(argv):
     Nj_ncap = int(60*refineR*refineS)
     if(refineR == 2):
         Nj_ncap = 119*refineS
+    if(refineR == 1):
+        Nj_ncap = 154 #80*refineS
     ###
     #South cap
     ###
     #To get the same number of points as existing 1/4 degree grids that were generated with MIDAS
     Nj_scap = int(refineR *  40)
+    if(refineR == 1):
+        Nj_scap = 0
     #Refine the grid by a factor and then exclude the inner circle corresponding to that factor
     #These factors are heuristic and we adjust them to get a grid with the same number of points
     #as the existing 1/4 degree grid of OM4p25
@@ -982,7 +999,7 @@ def main(argv):
         DeltaPhiMerc_no = phiMerc[-1,Ni//4]-phiMerc[-2,Ni//4]
         #Start lattitude from dy above the last Mercator grid
         lat0_bp = phiMerc[-1,Ni//4] + DeltaPhiMerc_no
-
+        if(refineR == 1): lat0_bp = phiMerc[-1,Ni//4]  
         if(match_dy):
             #The bopolar grid should start from the same lattitude that Mercator ends.
             #Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
@@ -1041,7 +1058,7 @@ def main(argv):
         if(write_subgrid_files):
             write_nc(lamBP,phiBP,dxBP,dyBP,areaBP,angleBP,axis_units='degrees',fnam=gridfilename+"BP.nc",description=desc,history=hist,source=source,debug=debug)
 
-    if("so" in grids or "all" in grids):
+    if(Nj_SO != 0 and ("so" in grids or "all" in grids)):
         ###
         ###Southern Ocean grid
         ###
@@ -1085,7 +1102,7 @@ def main(argv):
             write_nc(lamSO,phiSO,dxSO,dySO,areaSO,angleSO,axis_units='degrees',fnam=gridfilename+"SO.nc",description=desc,history=hist,source=source,debug=debug)
 
 
-    if("sc" in grids or "all" in grids):
+    if(Nj_scap != 0 and ("sc" in grids or "all" in grids)):
         ###
         ###Southern cap
         ###
@@ -1215,7 +1232,8 @@ def main(argv):
 
         if(write_subgrid_files):
             write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
-
+    hasSO=(Nj_SO>0)
+    hasSC=(Nj_scap>0)
     if("all" in grids):
         #Concatenate to generate the whole grid
         #Start from displaced southern cap and join the southern ocean grid
@@ -1238,7 +1256,6 @@ def main(argv):
         #      If the sub-grids are disjoint, 1 and 2 introduce a jump in y1 at the joint,
         #      as a result y1 and dy1 may become inconsistent?
         #
-        hasSC=True
         if(match_dy):
             #Cut the grid at south according to the options!
             #We may need to cut the whole SC grid and some of the SO
@@ -1266,7 +1283,7 @@ def main(argv):
                     dySC = dySC[jcut:,:]
                     areaSC = areaSC[jcut:,:]
                     angleSC = angleSC[jcut:,:]
-                else:
+                elif(hasSO): 
                     print("   Whole SC and some of SO need to be cut!")
                     print("   SO: shape[0], jcut",lamSO.shape[0],jcut)
                     hasSC=False
@@ -1283,7 +1300,7 @@ def main(argv):
                     areaSO = areaSO[jcut_SO:,:]
                     angleSO = angleSO[jcut_SO:,:]
 
-            if(hasSC):
+            if(hasSC and hasSO):
                 x1=np.concatenate((lamSC[:-1,:],lamSO),axis=0)
                 y1=np.concatenate((phiSC[:-1,:],phiSO),axis=0)
                 dx1=np.concatenate((dxSC[:-1,:],dxSO),axis=0)
@@ -1292,7 +1309,7 @@ def main(argv):
                 dy1=np.concatenate((dySC,dySO),axis=0)
                 area1=np.concatenate((areaSC,areaSO),axis=0)
                 cats = cats +1
-            else: #if the whole SC was cut
+            elif(hasSO): #if the whole SC was cut
                 x1=lamSO
                 y1=phiSO
                 dx1=dxSO
@@ -1301,13 +1318,21 @@ def main(argv):
                 angle1=angleSO
 
             #Join the Mercator grid
-            x2=np.concatenate((x1[:-1,:],lamMerc),axis=0)
-            y2=np.concatenate((y1[:-1,:],phiMerc),axis=0)
-            dx2=np.concatenate((dx1[:-1,:],dxMerc),axis=0)
-            angle2=np.concatenate((angle1[:-1,:],angleMerc),axis=0)
+            if(hasSO):
+                x2=np.concatenate((x1[:-1,:],lamMerc),axis=0)
+                y2=np.concatenate((y1[:-1,:],phiMerc),axis=0)
+                dx2=np.concatenate((dx1[:-1,:],dxMerc),axis=0)
+                angle2=np.concatenate((angle1[:-1,:],angleMerc),axis=0)
             #
-            dy2=np.concatenate((dy1,dyMerc),axis=0)
-            area2=np.concatenate((area1,areaMerc),axis=0)
+                dy2=np.concatenate((dy1,dyMerc),axis=0)
+                area2=np.concatenate((area1,areaMerc),axis=0)
+            else:
+                x2=lamMerc
+                y2=phiMerc
+                dx2=dxMerc
+                dy2=dyMerc
+                angle2=angleMerc
+                area2=areaMerc
             cats = cats +1
             #Join the norhern bipolar cap grid
             x3=np.concatenate((x2[:-1,:],lamBP),axis=0)
@@ -1322,26 +1347,40 @@ def main(argv):
                 raise Exception('lattitude array has repeated values along symmetry meridian!')
 
         else:
-            x1=np.concatenate((lamSC,lamSO[1:,:]),axis=0)
-            y1=np.concatenate((phiSC,phiSO[1:,:]),axis=0)
-            dx1=np.concatenate((dxSC,dxSO[1:,:]),axis=0)
-            dy1=np.concatenate((dySC,dySO),axis=0)
-            area1=np.concatenate((areaSC,areaSO),axis=0)
-            angle1=np.concatenate((angleSC[:-1,:],angleSO[:-1,:]),axis=0)
-            #Join the Mercator grid
-            x2=np.concatenate((x1,lamMerc[1:,:]),axis=0)
-            y2=np.concatenate((y1,phiMerc[1:,:]),axis=0)
-            dx2=np.concatenate((dx1,dxMerc[1:,:]),axis=0)
-            dy2=np.concatenate((dy1,dyMerc),axis=0)
-            area2=np.concatenate((area1,areaMerc),axis=0)
-            angle2=np.concatenate((angle1,angleMerc[:-1,:]),axis=0)
-            #Join the norhern bipolar cap grid
-            x3=np.concatenate((x2,lamBP[1:,:]),axis=0)
-            y3=np.concatenate((y2,phiBP[1:,:]),axis=0)
-            dx3=np.concatenate((dx2,dxBP[1:,:]),axis=0)
+            if(hasSC and hasSO):
+                x1=np.concatenate((lamSC,lamSO[1:,:]),axis=0)
+                y1=np.concatenate((phiSC,phiSO[1:,:]),axis=0)
+                dx1=np.concatenate((dxSC,dxSO[1:,:]),axis=0)
+                dy1=np.concatenate((dySC,dySO),axis=0)
+                area1=np.concatenate((areaSC,areaSO),axis=0)
+                angle1=np.concatenate((angleSC[:-1,:],angleSO[:-1,:]),axis=0)
+                #Join the Mercator grid
+                x2=np.concatenate((x1,lamMerc[1:,:]),axis=0)
+                y2=np.concatenate((y1,phiMerc[1:,:]),axis=0)
+                dx2=np.concatenate((dx1,dxMerc[1:,:]),axis=0)
+                dy2=np.concatenate((dy1,dyMerc),axis=0)
+                area2=np.concatenate((area1,areaMerc),axis=0)
+                angle2=np.concatenate((angle1,angleMerc[:-1,:]),axis=0)
+            else:
+                x2=lamMerc
+                y2=phiMerc
+                dx2=dxMerc
+                dy2=dyMerc
+                angle2=angleMerc
+                area2=areaMerc
+
+            #Join the northern bipolar cap grid
+            x3=np.concatenate((x2[:-1,:],lamBP),axis=0)
+            y3=np.concatenate((y2[:-1,:],phiBP),axis=0)
+            dx3=np.concatenate((dx2[:-1,:],dxBP),axis=0)
+            angle3=np.concatenate((angle2[:-1,:],angleBP),axis=0)
+            #
             dy3=np.concatenate((dy2,dyBP),axis=0)
             area3=np.concatenate((area2,areaBP),axis=0)
-            angle3=np.concatenate((angle2,angleBP),axis=0)
+            dy3_ = np.roll(y3[:,Ni//4],shift=-1,axis=0) - y3[:,Ni//4]
+            if(np.any(dy3_ == 0)):
+                raise Exception('lattitude array has repeated values along symmetry meridian!')
+
 
             if(south_cutoff_row > 0):
                 jcut = south_cutoff_row - 1
@@ -1370,7 +1409,7 @@ def main(argv):
         if(write_subgrid_files):
             if(hasSC):
                 write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
-            else:
+            elif(Nj_scap):
                 print("There remained no South Pole cap grid because of the number of rows cut= ", jcut, lamSC.shape[0])
         if(plotem):
             displacedPoleCap_plot (lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10))
