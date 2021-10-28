@@ -10,6 +10,9 @@ jobs:
     - uses: actions/setup-python@v2
       with:
         python-version: '>=3.6'
+    - name: Installs
+      run: 
+        sudo apt-get install libhdf5-dev libnetcf-dev
     - name: Install pytest
       run: python3 -m pip install pytest
     - name: Install numpypi
