@@ -854,7 +854,8 @@ def main(argv):
         source =  source + scriptpath + " had git hash " + scriptgithash + scriptgitMod
         source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
 
-
+    import time
+    start_time = time.time()
     # Specify the default grid properties
     refineS=2 # factor 2 is for supergrid
     refineR=degree_resolution_inverse
@@ -1448,6 +1449,8 @@ def main(argv):
         if(plotem):
             plot_mesh_in_xyz(x2,y2, stride=30,upperlat=-40, title="Grid south of -40 degrees")
             plot_mesh_in_xyz(x3,y3, stride=30,lowerlat=40, title="Grid north of 40 degrees")
+
+    print("runtime(secs)  %s" % (time.time() - start_time))
 
 if __name__ == "__main__":
    main(sys.argv[1:])
