@@ -1,3 +1,14 @@
+10/29/2021
+----------
+The md5 checksum hashes were obtained by using the following python setup
+
+export PYTHONPATH="/net2/nnz/opt/miniconda/lib/python3.8/site-packages"; export PATH="/net2/nnz/opt/miniconda/bin:$PATH"; export HDF5_USE_FILE_LOCKING=FALSE ; . activate om4labs
+
+Currenly the checksum don't match between gfdl-ws and gfdl-pan for 1/4 and 1/8 degree grids (ocean_hgrid_res0.25.nc and ocean_hgrid_res0.125.nc )
+
+#################################################
+OLD, deprecated
+#################################################
 #On gfdl pan the following were checked identical
 
 #To reproduce MIDAS grids:

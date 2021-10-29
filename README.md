@@ -5,7 +5,7 @@ Required python packages:
 - numpypi : python -m pip install git+https://github.com/underwoo/numpypi@pip.installable
  
 To test this module quickly try
-- make -f tests.mk quick
+- cd extras ; make -f Makefile.examples quick
 
 [Technical guide](https://github.com/nikizadehgfdl/grid_generation/blob/dev/ocean_grid_generator_guide.pdf)
 
