@@ -13,7 +13,8 @@ jobs:
     - name: Installs
       run: 
         sudo apt-get install libhdf5-dev libnetcf-dev
-        nc-config --all
+    - name: Checks
+      run: nc-config --all
     - name: Install pytest
       run: python3 -m pip install pytest
     - name: Install numpypi
