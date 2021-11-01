@@ -12,7 +12,7 @@ jobs:
         python-version: '>=3.6'
     - name: Installs
       run: 
-        sudo apt-get install libhdf5-dev libnetcf-dev
+        sudo apt-get install libhdf5-serial-dev netcdf-bin libhdf5-dev libnetcf-dev
     - name: Checks
       run: nc-config --all
     - name: Install pytest
