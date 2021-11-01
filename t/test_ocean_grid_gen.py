@@ -56,12 +56,14 @@ class TestOGG():
     assert sp.returncode == 0
     assert hashfile(outfile) == '12185aed9f1814c6b3c1545158338ee4160da96e2c9f389ffc31e1d3ed8c76ca'
     #assert hashfile(outfile) == '2d7840344aa356feb282d352bf21cce8832947b7989534290bd24d30dc561b70' #gfdl-pan
-  def test_hgrid_res0_125(self, tmpdir):
-    outfile = tmpdir.join('ocean_hgrid_res0.125.nc')
-    sp = subprocess.run([ogg_cmd,
-                         '-f', outfile, '-r', '8', '--rdp', '0.2',
-                         '--south_cutoff_row', '5', '--match_dy', '--even_j',
-                         '--write_subgrid_files', '--no_changing_meta'])
-    assert sp.returncode == 0
-    assert hashfile(outfile) == 'a5a5c859464aecda946a8d43ab238256fe26c5bec546a2d8d533de221276a63f'
-    #assert hashfile(outfile) == 'f1eb1fec9e47110013713c2fc69169a98423644673d9002749f5ded6c4b0a09b' #gfdl-pan
+
+# test_hgrid_res0_125 might require more memory than available on github Action platform
+#  def test_hgrid_res0_125(self, tmpdir):
+#    outfile = tmpdir.join('ocean_hgrid_res0.125.nc')
+#    sp = subprocess.run([ogg_cmd,
+#                         '-f', outfile, '-r', '8', '--rdp', '0.2',
+#                         '--south_cutoff_row', '5', '--match_dy', '--even_j',
+#                         '--write_subgrid_files', '--no_changing_meta'])
+#    assert sp.returncode == 0
+#    assert hashfile(outfile) == 'a5a5c859464aecda946a8d43ab238256fe26c5bec546a2d8d533de221276a63f'
+#    #assert hashfile(outfile) == 'f1eb1fec9e47110013713c2fc69169a98423644673d9002749f5ded6c4b0a09b' #gfdl-pan
