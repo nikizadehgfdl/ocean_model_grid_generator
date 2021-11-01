@@ -680,7 +680,7 @@ def metrics_error(dx_,dy_,area_,Ni,lat1,lat2=90,Re=_default_Re,bipolar=False,dis
     else:
         return area_error,lat_arc_error,lon_arc_error
 
-def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_changing_meta=None,debug=False):
+def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETCDF3_64BIT',description=None,history=None,source=None,no_meta=None,debug=False):
     import netCDF4 as nc
 
     if fnam is None:
@@ -727,7 +727,7 @@ def write_nc(x,y,dx,dy,area,angle_dx,axis_units='degrees',fnam=None,format='NETC
     anglev.units='degrees'
     anglev[:]=angle_dx
     #global attributes
-    if(not no_changing_meta):
+    if(not no_meta):
     	fout.history = history
     	fout.description = description
     	fout.source =  source
@@ -777,6 +777,7 @@ def main(argv):
     write_subgrid_files = False
     plotem = False
     no_changing_meta = False
+    no_meta = False
     enhanced_equatorial = False
     debug = False
     grids="bipolar,mercator,so,sc,all"
@@ -786,7 +787,7 @@ def main(argv):
     shift_equator_to_u_point=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","no_meta","enhanced_equatorial","no-metrics","gridlist="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -824,6 +825,8 @@ def main(argv):
              write_subgrid_files = True
         elif opt in ("--no_changing_meta"):
              no_changing_meta = True
+        elif opt in ("--no_meta"):
+             no_meta = True
         elif opt in ("--enhanced_equatorial"):
              enhanced_equatorial = True
         elif opt in ("--gridlist"):
@@ -848,11 +851,12 @@ def main(argv):
         hist = hist + " on "+ str(datetime.date.today()) + " on platform "+ host
 
     desc = "This is an orthogonal coordinate grid for the Earth with a nominal resoution of "+str(1/degree_resolution_inverse)+" degrees along the equator. "
+    desc = desc + "Generating tool https://github.com/nikizadehgfdl/ocean_model_grid_generator.git "
 
     source =""
     if(not no_changing_meta):
         source =  source + scriptpath + " had git hash " + scriptgithash + scriptgitMod
-        source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/grid_generation.git ; cd grid_generation;  git checkout "+scriptgithash
+        source =  source + ". To obtain the grid generating code do: git clone  https://github.com/nikizadehgfdl/ocean_model_grid_generator.git ; cd ocean_model_grid_generator;  git checkout "+scriptgithash
 
     import time
     start_time = time.time()
@@ -1413,14 +1417,14 @@ def main(argv):
             displacedPoleCap_plot2(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
 
         #write the whole grid file
-        desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "
-
-        desc = desc + "It is capped by a "
-        if(r_dp != 0.0):
-            desc = desc + "displaced pole "
-        else:
-            desc = desc + "regular "
-        desc = desc + "grid south of "+ str(lat0_SO) +" degrees."
+        desc = desc + "It consists of a bipolar northern cap"
+        desc = desc + "; a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees"
+        if(hasSO): desc = desc + "; a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees"
+        if(hasSC):
+          if(r_dp != 0.0):
+            desc = desc + "; a displaced pole southern cap."
+          else:
+            desc = desc + "; a regular grid southern cap."
 
         if(south_cutoff_ang > -90):
             desc = desc + " It is cut south of " + str(south_cutoff_ang) + " degrees."
@@ -1442,9 +1446,9 @@ def main(argv):
             raise Exception("Ooops: The number of j's in the supergrid is not even. Use option --south_cutoff_row to one more or on less row from south.")
         if(not reproduce_MIDAS_grids):
             print("shapes: ",x3.shape,y3.shape,dx3.shape,dy3.shape,area3.shape,angle3.shape)
-            write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
+            write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_meta=no_meta,debug=debug)
         else:
-            write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,format='NETCDF3_CLASSIC',description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
+            write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,format='NETCDF3_CLASSIC',description=desc,history=hist,source=source,no_meta=no_meta,debug=debug)
 
         print("Wrote the whole grid to file ",gridfilename)
 
