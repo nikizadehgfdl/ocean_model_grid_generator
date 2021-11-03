@@ -6,7 +6,6 @@ import numpypi.numpypi_series as np
 #import numpy as np
 import sys, getopt
 import datetime, os, subprocess
-import matplotlib.pyplot as plt
 #Constants
 PI_180 = np.pi/180.
 #_default_Re = 6.378e6
@@ -526,7 +525,7 @@ def cut_above(lam,phi,upperlat):
     return lam[0:jmax,:], phi[0:jmax,:]
 
 #utility function to plot grids
-def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None, axis=None):
+def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None, axis=None, block=False):
     import matplotlib.pyplot as plt
     import cartopy
 #    import seaborn as sns; sns.set()
@@ -547,9 +546,10 @@ def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig
 
     if title is not None:
         plt.title(title)
-    #plt.show()
+    if not block:
+        plt.show()
 
-def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None, axis=None):
+def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None, axis=None, block=False):
     if lowerlat is not None:
         lam,phi = cut_below(lam,phi,lowerlat=lowerlat)
     if upperlat is not None:
@@ -557,7 +557,7 @@ def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=
     x = np.cos(phi*PI_180) * np.cos(lam*PI_180)
     y = np.cos(phi*PI_180) * np.sin(lam*PI_180)
     z = np.sin(phi*PI_180)
-    plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title, axis=None)
+    plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title, axis=None, block=False)
 
 def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False):
     import cartopy.crs as ccrs
@@ -566,7 +566,7 @@ def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False):
     ax = plt.axes(projection=ccrs.NearsidePerspective(central_longitude=0.0, central_latitude=-90,satellite_height=3578400))
     ax.stock_img()
     ax.gridlines(draw_labels=True)
-    plot_mesh_in_latlon(x_s,y_s, stride=20, newfig=False, axis=ax)
+    plot_mesh_in_latlon(x_s,y_s, stride=20, newfig=False, axis=ax, block=block)
     return ax
 
 def mdist(x1,x2):
@@ -1204,7 +1204,6 @@ def main(argv):
             ax=displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SC, stride=int(refineR*10),block=True)
             if("so" in grids or "all" in grids):
                 plot_mesh_in_latlon(lamSO,phiSO, stride=int(refineR*10), newfig=False, axis=ax)
-            plt.show()
 
     if("all" in grids):
         #Concatenate to generate the whole grid
