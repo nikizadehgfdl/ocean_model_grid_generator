@@ -6,7 +6,7 @@ import numpypi.numpypi_series as np
 #import numpy as np
 import sys, getopt
 import datetime, os, subprocess
-
+import matplotlib.pyplot as plt
 #Constants
 PI_180 = np.pi/180.
 #_default_Re = 6.378e6
@@ -547,7 +547,7 @@ def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig
 
     if title is not None:
         plt.title(title)
-    plt.show()
+    #plt.show()
 
 def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None, axis=None):
     if lowerlat is not None:
@@ -567,7 +567,7 @@ def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False):
     ax.stock_img()
     ax.gridlines(draw_labels=True)
     plot_mesh_in_latlon(x_s,y_s, stride=20, newfig=False, axis=ax)
-    plt.show()
+    return ax
 
 def mdist(x1,x2):
   """Returns positive distance modulo 360."""
@@ -736,6 +736,7 @@ def main(argv):
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
     r_dp=0.0      # r value   of the displaced pole
     lon_dp=80.0   # longitude of the displaced pole
+    south_cap_lat=-99. # starting latitude of southern cap if input as arg
     south_cutoff_row = 0
     south_cutoff_ang = -90.
     reproduce_MIDAS_grids = False
@@ -752,7 +753,7 @@ def main(argv):
     shift_equator_to_u_point=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist=","south_cap_lat="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -776,6 +777,8 @@ def main(argv):
              r_dp = float(arg)
         elif opt in ("--londp"):
              lon_dp = float(arg)
+        elif opt in ("--south_cap_lat"):
+            south_cap_lat = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
         elif opt in ("--match_dy"):
@@ -846,6 +849,8 @@ def main(argv):
     #Southern Ocean grid
     ###
     lat0_SO=-78. #Starting lat of Southern Ocean grid
+    if(south_cap_lat>-90): 
+        lat0_SO=south_cap_lat
     lenlat_SO = phi_s_Merc-lat0_SO
     deltaPhiSO = 1.0/refineR/refineS
     #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS
@@ -1196,7 +1201,10 @@ def main(argv):
         if(write_subgrid_files):
             write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
         if(plotem):
-            displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
+            ax=displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SC, stride=int(refineR*10),block=True)
+            if("so" in grids or "all" in grids):
+                plot_mesh_in_latlon(lamSO,phiSO, stride=int(refineR*10), newfig=False, axis=ax)
+            plt.show()
 
     if("all" in grids):
         #Concatenate to generate the whole grid
