@@ -547,7 +547,7 @@ def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig
 
     if title is not None:
         plt.title(title)
-#    plt.show()
+    plt.show()
 
 def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None, axis=None):
     if lowerlat is not None:
@@ -1371,8 +1371,6 @@ def main(argv):
                 write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
             elif(Nj_scap != 0):
                 print("There remained no South Pole cap grid because of the number of rows cut= ", jcut, lamSC.shape[0])
-        if(plotem):
-            displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
 
         #write the whole grid file
         desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "
