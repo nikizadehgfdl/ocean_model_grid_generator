@@ -1313,6 +1313,8 @@ def main(argv):
                 raise Exception('lattitude array has repeated values along symmetry meridian!')
 
         else:
+          #Note: angle variable has the same shape as x1,y1,dx1 and should be treated just like them.
+          #      I think the way is treated below unlike them is a bug, but fixing the bug will change the produced grids.   
           if(hasSC and hasSO):
             x1=np.concatenate((lamSC,lamSO[1:,:]),axis=0)
             y1=np.concatenate((phiSC,phiSO[1:,:]),axis=0)
@@ -1332,7 +1334,7 @@ def main(argv):
             y2=phiMerc
             dx2=dxMerc
             dy2=dyMerc
-            angle2=angleMerc
+            angle2=angleMerc[:-1,:]
             area2=areaMerc
           #Join the norhern bipolar cap grid
           x3=np.concatenate((x2,lamBP[1:,:]),axis=0)
@@ -1401,6 +1403,7 @@ def main(argv):
         if(y3.shape[0]%2 == 0):
             raise Exception("Ooops: The number of j's in the supergrid is not even. Use option --south_cutoff_row to one more or on less row from south.")
         if(not reproduce_MIDAS_grids):
+            print("shapes: ",x3.shape,y3.shape,dx3.shape,dy3.shape,area3.shape,angle3.shape)
             write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
         else:
             write_nc(x3,y3,dx3,dy3,area3,angle3,axis_units='degrees',fnam=gridfilename,format='NETCDF3_CLASSIC',description=desc,history=hist,source=source,no_changing_meta=no_changing_meta,debug=debug)
