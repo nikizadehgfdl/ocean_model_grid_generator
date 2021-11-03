@@ -526,22 +526,30 @@ def cut_above(lam,phi,upperlat):
     return lam[0:jmax,:], phi[0:jmax,:]
 
 #utility function to plot grids
-def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None):
+def plot_mesh_in_latlon(lam, phi, stride=1, phi_color='k', lam_color='r', newfig=True, title=None, axis=None):
     import matplotlib.pyplot as plt
+    import cartopy
 #    import seaborn as sns; sns.set()
     if (phi.shape != lam.shape): raise Exception('Ooops: lam and phi should have same shape')
     nj,ni = lam.shape
     if(newfig):
         plt.figure(figsize=(10,10))
-    for i in range(0,ni,stride):
+    if(axis is None):
+      for i in range(0,ni,stride):
         plt.plot(lam[:,i],phi[:,i],lam_color)
-    for j in range(0,nj,stride):
+      for j in range(0,nj,stride):
         plt.plot(lam[j,:],phi[j,:],phi_color)
+    else:
+      for i in range(0,ni,stride):
+        axis.plot(lam[:,i],phi[:,i],lam_color, transform=cartopy.crs.Geodetic())
+      for j in range(0,nj,stride):
+        axis.plot(lam[j,:],phi[j,:],phi_color, transform=cartopy.crs.Geodetic())
+
     if title is not None:
         plt.title(title)
 #    plt.show()
 
-def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None):
+def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=None, upperlat=None, newfig=True, title=None, axis=None):
     if lowerlat is not None:
         lam,phi = cut_below(lam,phi,lowerlat=lowerlat)
     if upperlat is not None:
@@ -549,59 +557,17 @@ def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=
     x = np.cos(phi*PI_180) * np.cos(lam*PI_180)
     y = np.cos(phi*PI_180) * np.sin(lam*PI_180)
     z = np.sin(phi*PI_180)
-    plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title)
+    plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title, axis=None)
 
-def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0_SO, stride=40,block=False):
-    import matplotlib.pyplot as plt
-    plt.figure(figsize=(10,10))
-    x_s=x_s+lon0
-    plot_mesh_in_xyz(x_s,y_s, stride=stride, newfig=False)
-    lam__ = x_s[-1,0]
-    phi__ = y_s[-1,0]
-    x__ = np.cos(phi__*PI_180) * np.cos(lam__*PI_180)
-    y__ = np.cos(phi__*PI_180) * np.sin(lam__*PI_180)
-    plt.annotate("i=0",xy=(x__,y__), xytext=(x__-0.01,y__+0.01),arrowprops=dict(arrowstyle="->"))
-
-    #plot the location of the displaced pole
-    lam__=np.array([lon_dp,lon_dp])+lon0
-    phi__=np.array([lat0_SO+2,lat0_SO-2])
-    x__ = np.cos(phi__*PI_180) * np.cos(lam__*PI_180)
-    y__ = np.cos(phi__*PI_180) * np.sin(lam__*PI_180)
-    plt.plot(x__,y__, linestyle='dashed')
-    plt.annotate("pole's lon",xy=(x__[0],y__[0]), xytext=(x__[0],y__[0]+0.01),arrowprops=dict(arrowstyle="->"))
-
-    n_i=x_s.shape[1]-1
-    poles_i=int(n_i*np.mod(lon_dp-lon0,360)/360.)
-    lam__=x_s[:,poles_i]
-    phi__=y_s[:,poles_i]
-    x__ = np.cos(phi__*PI_180) * np.cos(lam__*PI_180)
-    y__ = np.cos(phi__*PI_180) * np.sin(lam__*PI_180)
-    plt.plot(x__,y__,linewidth=4, color='green')
-
-    antipoles_i=int(n_i*np.mod(180+lon_dp-lon0,360)/360.)
-    lam__=x_s[:,antipoles_i]
-    phi__=y_s[:,antipoles_i]
-    x__ = np.cos(phi__*PI_180) * np.cos(lam__*PI_180)
-    y__ = np.cos(phi__*PI_180) * np.sin(lam__*PI_180)
-    plt.plot(x__,y__,linewidth=4, color='blue')
-    plt.show(block)
-
-def displacedPoleCap_plot2(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False):
-    from mpl_toolkits.basemap import Basemap
+def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False):
+    import cartopy.crs as ccrs
     import matplotlib.pyplot as plt
     plt.figure(figsize=(10, 10))
-    m = Basemap(projection='spstere',boundinglat=-60,lon_0=300,resolution='l')
-    m.drawcoastlines()
-    m.fillcontinents(color='coral',lake_color='aqua')
-    m.drawparallels(np.arange(lat0,0.,10.),labels=[True,True])
-    m.drawmeridians(np.arange(0.,360.,20.),labels=[True,True,True,True])
-    m.drawmeridians(np.arange(lon_dp,lon_dp+1,1.),labels=[True,True,True,True],color='r',linewidth=4)
-    m.drawmapboundary(fill_color='aqua')
-
-    x, y = m(x_s[::2,::80],y_s[::2,::80])
-    plt.plot(x, y, 'ok', markersize=2)
-    plt.show(block)
-
+    ax = plt.axes(projection=ccrs.NearsidePerspective(central_longitude=0.0, central_latitude=-90,satellite_height=3578400))
+    ax.stock_img()
+    ax.gridlines(draw_labels=True)
+    plot_mesh_in_latlon(x_s,y_s, stride=20, newfig=False, axis=ax)
+    plt.show()
 
 def mdist(x1,x2):
   """Returns positive distance modulo 360."""
@@ -1141,9 +1107,6 @@ def main(argv):
 
                 lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)
                 angleSC=angle_x(lamSC,phiSC)
-                if(plotem):
-                    displacedPoleCap_plot (lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10))
-                    displacedPoleCap_plot2(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10))
 
                 #Quadrature metrics using great circle approximations for the h's
                 dxSC  =-np.ones([lamSC.shape[0],lamSC.shape[1]-1])
@@ -1232,6 +1195,8 @@ def main(argv):
 
         if(write_subgrid_files):
             write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
+        if(plotem):
+            displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
 
     if("all" in grids):
         #Concatenate to generate the whole grid
@@ -1407,8 +1372,7 @@ def main(argv):
             elif(Nj_scap != 0):
                 print("There remained no South Pole cap grid because of the number of rows cut= ", jcut, lamSC.shape[0])
         if(plotem):
-            displacedPoleCap_plot (lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10))
-            displacedPoleCap_plot2(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
+            displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SO, stride=int(refineR*10),block=True)
 
         #write the whole grid file
         desc = desc + "It consists of a Mercator grid spanning "+ str(phiMerc[0,0]) + " to " + str(phiMerc[-1,0]) + " degrees, flanked by a bipolar northern cap and a regular lat-lon grid spanning " + str(phiMerc[0,0]) + " to " + str(lat0_SO)+" degrees. "
