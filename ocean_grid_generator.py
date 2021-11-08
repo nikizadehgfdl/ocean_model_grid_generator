@@ -415,30 +415,32 @@ def displacedPoleCap_mesh(i,j,ni,nj,lon0,lat0,lam_pole,r_pole,excluded_fraction=
     r_joint = np.tan((90+lat0)*PI_180)
     z_0= r_pole * (np.cos(lam_pole*PI_180)+1j*np.sin(lam_pole*PI_180))
     lams,phis = displacedPoleCap_projection(lamg,phig,z_0,r_joint)
-
+    londp=lams[0,0]
+    latdp=phis[0,0]
     if excluded_fraction is not None:
         ny,nx = lamg.shape
         jmin=np.ceil(excluded_fraction*ny)
         jmin=jmin+np.mod(jmin,2)
         jmint = int(jmin)
-        return lams[jmint:,:], phis[jmint:,:]
+        return lams[jmint:,:], phis[jmint:,:],londp,latdp
     else:
-        return lams,phis
+        return lams,phis,londp,latdp
 
 def generate_displaced_pole_grid(Ni,Nj_scap,lon0,lat0,lon_dp,r_dp):
     print( 'Generating displaced pole grid bounded at latitude ',lat0  )
-    print('   rdp=',r_dp,' londp=',lon_dp)
+    print('   requested displaced pole lon,rdp=',lon_dp,r_dp)
     i_s=np.arange(Ni+1)
     j_s=np.arange(Nj_scap+1)
-    x,y= displacedPoleCap_mesh(i_s,j_s,Ni,Nj_scap,lon0,lat0,lon_dp,r_dp)
-    return x,y
+    x,y,londp,latdp= displacedPoleCap_mesh(i_s,j_s,Ni,Nj_scap,lon0,lat0,lon_dp,r_dp)
+    print("   generated displaced pole lon,lat=",londp,latdp)
+    return x,y,londp,latdp
 
 #numerical approximation of metrics coefficients h_i and h_j
 def great_arc_distance(j0, i0, j1, i1, nx,ny ,lon0,lat0,lon_dp,r_dp):
     """Returns great arc distance between nodes (j0,i0) and (j1,i1)"""
     # https://en.wikipedia.org/wiki/Great-circle_distance
-    lam0,phi0= displacedPoleCap_mesh(i0,j0, nx,ny,lon0,lat0,lon_dp,r_dp)
-    lam1,phi1= displacedPoleCap_mesh(i1,j1, nx,ny,lon0,lat0,lon_dp,r_dp)
+    lam0,phi0,x,y= displacedPoleCap_mesh(i0,j0, nx,ny,lon0,lat0,lon_dp,r_dp)
+    lam1,phi1,x,y= displacedPoleCap_mesh(i1,j1, nx,ny,lon0,lat0,lon_dp,r_dp)
     lam0,phi0=lam0*PI_180,phi0*PI_180
     lam1,phi1=lam1*PI_180,phi1*PI_180
     dphi, dlam = phi1 - phi0, lam1 - lam0
@@ -559,14 +561,17 @@ def plot_mesh_in_xyz(lam, phi, stride=1, phi_color='k', lam_color='r', lowerlat=
     z = np.sin(phi*PI_180)
     plot_mesh_in_latlon(x, y, stride=stride, phi_color=phi_color, lam_color=lam_color, newfig=newfig, title=title, axis=None, block=False)
 
-def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False):
+def displacedPoleCap_plot(x_s,y_s,lon0,lon_dp,lat0, stride=40,block=False,dplat=None):
     import cartopy.crs as ccrs
     import matplotlib.pyplot as plt
     plt.figure(figsize=(10, 10))
     ax = plt.axes(projection=ccrs.NearsidePerspective(central_longitude=0.0, central_latitude=-90,satellite_height=3578400))
     ax.stock_img()
     ax.gridlines(draw_labels=True)
-    plot_mesh_in_latlon(x_s,y_s, stride=20, newfig=False, axis=ax, block=block)
+    plot_mesh_in_latlon(x_s,y_s, stride=stride, newfig=False, axis=ax, block=block)
+    if dplat is not None:
+       ax.plot(lon_dp,dplat,color='r',marker='*', transform=ccrs.Geodetic()) 
+
     return ax
 
 def mdist(x1,x2):
@@ -735,10 +740,12 @@ def main(argv):
     south_cap = True
     gridfilename = 'tripolar_res'+str(degree_resolution_inverse)+'.nc'
     r_dp=0.0      # r value   of the displaced pole
+    lat_dp=-99.   # latitude of the displaced pole if input as arg
     lon_dp=80.0   # longitude of the displaced pole
-    south_cap_lat=-99. # starting latitude of southern cap if input as arg
+    south_cap_lat=-99. # starting lower latitude of southern cap if input as arg
     south_cutoff_row = 0
     south_cutoff_ang = -90.
+    south_ocean_upper_lat=-99. # starting upper latitude of southern ocean if input as arg
     reproduce_MIDAS_grids = False
     match_dy = False
     write_subgrid_files = False
@@ -753,7 +760,7 @@ def main(argv):
     shift_equator_to_u_point=True
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist=","south_cap_lat="])
+        opts, args = getopt.getopt(sys.argv[1:],"hdf:r:",["gridfilename=","inverse_resolution=","south_cutoff_ang=","south_cutoff_row=","rdp=","latdp=","londp=","reproduce_MIDAS_grids","match_dy","even_j","plot","write_subgrid_files","no_changing_meta","enhanced_equatorial","no-metrics","gridlist=","south_cap_lat=","south_ocean_upper_lat="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -775,10 +782,14 @@ def main(argv):
             south_cutoff_row = int(arg)
         elif opt in ("--rdp"):
              r_dp = float(arg)
+        elif opt in ("--latdp"):
+             lat_dp = float(arg)
         elif opt in ("--londp"):
              lon_dp = float(arg)
         elif opt in ("--south_cap_lat"):
-            south_cap_lat = float(arg)
+             south_cap_lat = float(arg)
+        elif opt in ("--south_ocean_upper_lat"):
+             south_ocean_upper_lat = float(arg)
         elif opt in ("--reproduce_MIDAS_grids"):
              reproduce_MIDAS_grids = True
         elif opt in ("--match_dy"):
@@ -799,6 +810,12 @@ def main(argv):
              grids = arg
         else:
             assert False, "unhandled option"
+
+    #Exit if mutually exclusive arguments are provided
+    if(r_dp != 0.0 and lat_dp > -90.):
+        print("Cannot specify both --rdp and --latdp for the displaced pole!")
+        usage()
+        sys.exit(2)
 
     #Information to write in file as metadata
     if(not no_changing_meta):
@@ -848,10 +865,13 @@ def main(argv):
     ###
     #Southern Ocean grid
     ###
-    lat0_SO=-78. #Starting lat of Southern Ocean grid
+    lat0_SO=-78. #Starting lower lat of Southern Ocean grid
     if(south_cap_lat>-90): 
         lat0_SO=south_cap_lat
-    lenlat_SO = phi_s_Merc-lat0_SO
+    latUp_SO=phi_s_Merc
+    if(south_ocean_upper_lat>-90): 
+        latUp_SO=south_ocean_upper_lat
+    lenlat_SO = latUp_SO-lat0_SO
     deltaPhiSO = 1.0/refineR/refineS
     #To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS
     Nj_SO  =int(refineR*  55)
@@ -1077,7 +1097,7 @@ def main(argv):
         ###
         ###Southern cap
         ###
-        if(r_dp == 0.0):
+        if(r_dp == 0.0 and lat_dp < -90.):
             fullArc = lat0_SC+90.
             Nj_scap = int(fullArc/deltaPhiSO)
             if(not reproduce_MIDAS_grids):
@@ -1110,7 +1130,10 @@ def main(argv):
                     #This way we get a continous dy and area.
                     lat0_SC=lat0_SO
 
-                lamSC,phiSC = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)
+                if(lat_dp > -90):
+                    r_dp = np.tan((90+lat_dp)*PI_180)/np.tan((90+lat0_SC)*PI_180)
+
+                lamSC,phiSC,londp,latdp = generate_displaced_pole_grid(Ni,Nj_scap,lon0,lat0_SC,lon_dp,r_dp)
                 angleSC=angle_x(lamSC,phiSC)
 
                 #Quadrature metrics using great circle approximations for the h's
@@ -1201,7 +1224,8 @@ def main(argv):
         if(write_subgrid_files):
             write_nc(lamSC,phiSC,dxSC,dySC,areaSC,angleSC,axis_units='degrees',fnam=gridfilename+"SC.nc",description=desc,history=hist,source=source,debug=debug)
         if(plotem):
-            ax=displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SC, stride=int(refineR*10),block=True)
+            ax=displacedPoleCap_plot(lamSC,phiSC,lon0,lon_dp,lat0_SC, stride=int(refineR*10),block=True,dplat=latdp)
+           
             if("so" in grids or "all" in grids):
                 plot_mesh_in_latlon(lamSO,phiSO, stride=int(refineR*10), newfig=False, axis=ax)
 
