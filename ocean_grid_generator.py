@@ -992,6 +992,7 @@ def main(argv):
     r_dp = 0.0  # r value   of the displaced pole
     lat_dp = -99.0  # latitude of the displaced pole if input as arg
     lon_dp = 80.0  # longitude of the displaced pole
+    doughnut = 0.28 * 7 / 4 # fraction of dp grid to be excluded/cut, this particular value was used for the OM4 1/4 degree grid 
     south_cap_lat = -99.0  # starting lower latitude of southern cap if input as arg
     south_cutoff_row = 0
     south_cutoff_ang = -90.0
@@ -1028,6 +1029,7 @@ def main(argv):
                 "rdp=",
                 "latdp=",
                 "londp=",
+                "exfracdp=",
                 "reproduce_MIDAS_grids",
                 "match_dy",
                 "even_j",
@@ -1066,6 +1068,8 @@ def main(argv):
             lat_dp = float(arg)
         elif opt in ("--londp"):
             lon_dp = float(arg)
+        elif opt in ("--exfracdp"):
+            doughnut = float(arg)
         elif opt in ("--south_cap_lat"):
             south_cap_lat = float(arg)
         elif opt in ("--south_ocean_upper_lat"):
@@ -1218,7 +1222,7 @@ def main(argv):
     # These factors are heuristic and we adjust them to get a grid with the same number of points
     # as the existing 1/4 degree grid of OM4p25
     Nj_scap = Nj_scap * 7 // 4
-    doughnut = 0.28 * 7 / 4
+
     lat0_SC = lat0_SO
 
     if "mercator" in grids or "all" in grids:
