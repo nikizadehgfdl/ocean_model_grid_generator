@@ -992,7 +992,9 @@ def main(argv):
     r_dp = 0.0  # r value   of the displaced pole
     lat_dp = -99.0  # latitude of the displaced pole if input as arg
     lon_dp = 80.0  # longitude of the displaced pole
-    doughnut = 0.28 * 7 / 4 # fraction of dp grid to be excluded/cut, this particular value was used for the OM4 1/4 degree grid 
+    doughnut = (
+        0.28 * 7 / 4
+    )  # fraction of dp grid to be excluded/cut, this particular value was used for the OM4 1/4 degree grid
     south_cap_lat = -99.0  # starting lower latitude of southern cap if input as arg
     south_cutoff_row = 0
     south_cutoff_ang = -90.0
