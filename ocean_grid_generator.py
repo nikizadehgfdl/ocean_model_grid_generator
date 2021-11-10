@@ -5,6 +5,7 @@ from __future__ import print_function
 import numpypi.numpypi_series as np
 
 # import numpy as np
+import argparse
 import sys, getopt
 import datetime, os, subprocess
 
@@ -982,120 +983,44 @@ def usage():
     )
 
 
-def main(argv):
+def main(
+    inverse_resolution,
+    gridfilename="ocean_hgrid.nc",
+    r_dp=0.0,
+    lon_dp=80.0,
+    lat_dp=-99.0,
+    exfracdp=None,
+    south_cutoff_row=0,
+    south_cutoff_ang=-90.0,
+    reproduce_MIDAS_grids=False,
+    match_dy=False,
+    write_subgrid_files=False,
+    plotem=False,
+    no_changing_meta=False,
+    enhanced_equatorial=False,
+    debug=False,
+    grids=["bipolar", "mercator", "so", " sc", "all"],
+    skip_metrics=False,
+    ensure_nj_even=False,
+    shift_equator_to_u_point=True,
+    south_cap_lat=-99.0,
+    south_ocean_upper_lat=-99.0,
+    no_south_cap=False,
+):
 
-    degree_resolution_inverse = (
-        4  # (2 for half) or (4 for quarter) or (8 for 1/8) degree grid
-    )
-    south_cap = True
-    gridfilename = "tripolar_res" + str(degree_resolution_inverse) + ".nc"
-    r_dp = 0.0  # r value   of the displaced pole
-    lat_dp = -99.0  # latitude of the displaced pole if input as arg
-    lon_dp = 80.0  # longitude of the displaced pole
-    doughnut = (
-        0.28 * 7 / 4
-    )  # fraction of dp grid to be excluded/cut, this particular value was used for the OM4 1/4 degree grid
-    south_cap_lat = -99.0  # starting lower latitude of southern cap if input as arg
-    south_cutoff_row = 0
-    south_cutoff_ang = -90.0
-    south_ocean_upper_lat = (
-        -99.0
-    )  # starting upper latitude of southern ocean if input as arg
-    reproduce_MIDAS_grids = False
-    match_dy = False
-    write_subgrid_files = False
-    plotem = False
-    no_changing_meta = False
-    enhanced_equatorial = False
-    debug = False
-    grids = "bipolar,mercator,so,sc,all"
-    calculate_metrics = True
-    # Ensure the number of j partitions are even for the sub-grids
-    ensure_nj_even = False
-    shift_equator_to_u_point = True
+    # fraction of dp grid to be excluded/cut, this particular value was used for the OM4 1/4 degree grid
+    doughnut = 0.28 * 7 / 4
+    doughnut = exfracdp if (exfracdp is not None) else doughnut
+
+    south_cap = not no_south_cap
+    calculate_metrics = not skip_metrics
+    degree_resolution_inverse = inverse_resolution
+
     hasBP = False
     hasMerc = False
     hasSO = False
     hasSC = False
     stitch = True
-
-    try:
-        opts, args = getopt.getopt(
-            sys.argv[1:],
-            "hdf:r:",
-            [
-                "gridfilename=",
-                "inverse_resolution=",
-                "south_cutoff_ang=",
-                "south_cutoff_row=",
-                "rdp=",
-                "latdp=",
-                "londp=",
-                "exfracdp=",
-                "reproduce_MIDAS_grids",
-                "match_dy",
-                "even_j",
-                "plot",
-                "write_subgrid_files",
-                "no_changing_meta",
-                "enhanced_equatorial",
-                "no-metrics",
-                "gridlist=",
-                "south_cap_lat=",
-                "south_ocean_upper_lat=",
-            ],
-        )
-    except getopt.GetoptError as err:
-        print(err)
-        usage()
-        sys.exit(2)
-
-    for opt, arg in opts:
-        if opt == "-h":
-            usage()
-            sys.exit()
-        elif opt in ("-f", "--gridfilename"):
-            gridfilename = arg
-        elif opt in ("-r", "--inverse_resolution"):
-            degree_resolution_inverse = float(arg)
-        elif opt in ("-d"):
-            debug = True
-        elif opt in ("--south_cutoff_ang"):
-            south_cutoff_ang = float(arg)
-        elif opt in ("--south_cutoff_row"):
-            south_cutoff_row = int(arg)
-        elif opt in ("--rdp"):
-            r_dp = float(arg)
-        elif opt in ("--latdp"):
-            lat_dp = float(arg)
-        elif opt in ("--londp"):
-            lon_dp = float(arg)
-        elif opt in ("--exfracdp"):
-            doughnut = float(arg)
-        elif opt in ("--south_cap_lat"):
-            south_cap_lat = float(arg)
-        elif opt in ("--south_ocean_upper_lat"):
-            south_ocean_upper_lat = float(arg)
-        elif opt in ("--reproduce_MIDAS_grids"):
-            reproduce_MIDAS_grids = True
-        elif opt in ("--match_dy"):
-            match_dy = True
-        elif opt in ("--even_j"):
-            ensure_nj_even = True
-        elif opt in ("--plot"):
-            plotem = True
-        elif opt in ("--no-metrics"):
-            calculate_metrics = False
-        elif opt in ("--write_subgrid_files"):
-            write_subgrid_files = True
-        elif opt in ("--no_changing_meta"):
-            no_changing_meta = True
-        elif opt in ("--enhanced_equatorial"):
-            enhanced_equatorial = True
-        elif opt in ("--gridlist"):
-            grids = arg
-        else:
-            assert False, "unhandled option"
 
     # Exit if mutually exclusive arguments are provided
     if r_dp != 0.0 and lat_dp > -90.0:
@@ -2173,4 +2098,166 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+
+    parser = argparse.ArgumentParser(description="create ocean hgrid")
+
+    parser.add_argument(
+        "-r",
+        "--inverse_resolution",
+        type=float,
+        required=True,
+        help="inverse of the horizontal resolution (e.g. 4 for 1/4 degree)",
+    )
+
+    parser.add_argument(
+        "-f",
+        "--gridfilename",
+        type=str,
+        required=False,
+        default="ocean_hgrid.nc",
+        help="name for output grid file",
+    )
+
+    parser.add_argument(
+        "--r_dp",
+        type=float,
+        required=False,
+        default=0.0,
+        help="displacement factor/0.2",
+    )
+
+    parser.add_argument(
+        "--lon_dp",
+        type=float,
+        required=False,
+        default=80.0,
+        help="",
+    )
+
+    parser.add_argument(
+        "--lat_dp",
+        type=float,
+        required=False,
+        default=80.0,
+        help="",
+    )
+
+    parser.add_argument(
+        "--exfracdp",
+        type=float,
+        required=False,
+        default=None,
+        help="",
+    )
+
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="debug mode",
+    )
+
+    parser.add_argument(
+        "--south_cutoff_ang",
+        type=float,
+        required=False,
+        default=-90.0,
+        help="degrees south to start",
+    )
+
+    parser.add_argument(
+        "--south_cutoff_row",
+        type=int,
+        required=False,
+        default=0,
+        help="rows south to cut",
+    )
+
+    parser.add_argument(
+        "--south_cap_lat",
+        type=float,
+        required=False,
+        default=-99.0,
+        help="",
+    )
+
+    parser.add_argument(
+        "--south_ocean_upper_lat",
+        type=float,
+        required=False,
+        default=-99.0,
+        help="",
+    )
+
+    parser.add_argument(
+        "--no_south_cap",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--reproduce_MIDAS_grids",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--match_dy",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--ensure_nj_even",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--plotem",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--skip_metrics",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--write_subgrid_files",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--no_changing_meta",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--enhanced_equatorial",
+        action="store_true",
+        help="",
+    )
+
+    parser.add_argument(
+        "--shift_equator_to_u_point",
+        action="store_false",
+        help="",
+    )
+
+    parser.add_argument(
+        "--grids",
+        type=str,
+        nargs="+",
+        required=False,
+        default="all",
+        help="choices are bipolar, mercator, so, sc, all. Default is all",
+    )
+
+    args = vars(parser.parse_args())
+
+    main(**args)
