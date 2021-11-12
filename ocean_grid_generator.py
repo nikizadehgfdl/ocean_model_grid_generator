@@ -2138,7 +2138,7 @@ if __name__ == "__main__":
         "--lat_dp",
         type=float,
         required=False,
-        default=80.0,
+        default=-99.0,
         help="",
     )
 
