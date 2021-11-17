@@ -1773,7 +1773,7 @@ def main(argv):
                     metrics_error(dxSC, dySC, areaSC, Ni, phiSC[-1, 0], phiSC[0, 0]),
                 )
 
-        if not "all" in grids:  # if only "sc" was requested cut it according to args
+        if grids == 'sc':  # if only "sc" was requested cut it according to args
             # Cut the grid at south according to the options!
             # We may need to cut the whole SC grid and some of the SO
             cut = False
