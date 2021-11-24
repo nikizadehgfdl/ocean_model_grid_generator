@@ -21,7 +21,7 @@ class TestOGG:
     def test_hgrid_res4_0(self, tmpdir):
         outfile = tmpdir.join("ocean_hgrid_res4.0.nc")
         sp = subprocess.run(
-            [ogg_cmd, "-f", outfile, "-r", "0.25", "--even_j", "--no_changing_meta"]
+            [ogg_cmd, "-f", outfile, "-r", "0.25", "--ensure_nj_even", "--no_changing_meta"]
         )
         assert sp.returncode == 0
         assert (
@@ -89,7 +89,7 @@ class TestOGG:
                 outfile,
                 "-r",
                 "4",
-                "--rdp",
+                "--r_dp",
                 "0.2",
                 "--south_cutoff_row",
                 "83",
@@ -110,8 +110,8 @@ class TestOGG:
 #  def test_hgrid_res0_125(self, tmpdir):
 #    outfile = tmpdir.join('ocean_hgrid_res0.125.nc')
 #    sp = subprocess.run([ogg_cmd,
-#                         '-f', outfile, '-r', '8', '--rdp', '0.2',
-#                         '--south_cutoff_row', '5', '--match_dy', '--even_j',
+#                         '-f', outfile, '-r', '8', '--r_dp', '0.2',
+#                         '--south_cutoff_row', '5', '--match_dy', '--ensure_nj_even',
 #                         '--write_subgrid_files', '--no_changing_meta'])
 #    assert sp.returncode == 0
 #    assert hashfile(outfile) == 'a5a5c859464aecda946a8d43ab238256fe26c5bec546a2d8d533de221276a63f'#gfdl-pan106,pan105
