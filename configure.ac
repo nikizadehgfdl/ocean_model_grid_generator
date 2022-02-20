@@ -49,7 +49,7 @@ AX_PROG_PYTHON_VERSION([3.6], ,AC_MSG_ERROR([unable to find a python version >=3
 # Check for required python modules
 # pytest is needed for tests to run
 AX_PYTHON_MODULE([pytest])
-AC_PATH_PROG([PYTEST], [pytest])
+AC_PATH_PROGS([PYTEST], [pytest-3 pytest])
 
 AS_IF([test ${enable_venv:-no} = "yes"], [
 # venv is needed if installing in a virtural environment

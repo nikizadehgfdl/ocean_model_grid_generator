@@ -37,11 +37,11 @@ endif
 
 if ENABLE_VENV
 venv-test:
-	python3 -m venv $(builddir)/venv-test
+	$(PYTHON) -m venv $(builddir)/venv-test
 	. $(builddir)/venv-test/bin/activate && \
-	python3 -m pip install pytest && \
-	python3 -m pip install git+https://github.com/underwoo/numpypi.git@pip.installable && \
-	python3 -m pip install $(top_srcdir)
+	$(PYTHON) -m pip install pytest && \
+	$(PYTHON) -m pip install git+https://github.com/adcroft/numpypi.git && \
+	$(PYTHON) -m pip install $(top_srcdir)
 
 test_funcs.py: venv-test
 
