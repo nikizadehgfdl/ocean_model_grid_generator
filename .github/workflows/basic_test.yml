@@ -18,5 +18,5 @@ jobs:
       run: sudo apt-get install libhdf5-serial-dev netcdf-bin libhdf5-dev libnetcf-dev
     - name: Install netCDF4
       run: python3 -m pip install netCDF4
-    - name: numpypi series test
+    - name: ocean_grid_generator test
       run: pytest -v

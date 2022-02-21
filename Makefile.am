@@ -28,9 +28,9 @@ if ENABLE_VENV
 install-exec-local:
 	$(PYTHON) -m venv $(DESTDIR)$(pkglibexecdir)
 	. $(DESTDIR)$(pkglibexecdir)/bin/activate && \
-	$(PYTHON) -m pip install git+https://github.com/underwoo/numpypi.git && \
+	$(PYTHON) -m pip install git+https://github.com/adcroft/numpypi.git && \
 	$(PYTHON) -m pip install $(srcdir)
 
 install-exec-hook:
-	sed -i -e "s|^#!/usr/bin/env python$$|#!$(pkglibexecdir)/bin/python|" $(DESTDIR)$(bindir)/ocean_grid_generator.py
+	$(SED) -i -e "s|^#!/usr/bin/env python$$|#!$(pkglibexecdir)/bin/python|" $(DESTDIR)$(bindir)/ocean_grid_generator.py
 endif

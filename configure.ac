@@ -42,6 +42,8 @@ AC_ARG_ENABLE([venv],
     [enable_venv=no])
 AM_CONDITIONAL([ENABLE_VENV], [test x"$enable_venv" = x"yes"])
 
+AC_PROG_SED
+
 # Find a python version >=3.6
 AC_PATH_PROGS([PYTHON], [python3 python])
 AX_PROG_PYTHON_VERSION([3.6], ,AC_MSG_ERROR([unable to find a python version >=3.6 in PATH]))
@@ -50,7 +52,6 @@ AX_PROG_PYTHON_VERSION([3.6], ,AC_MSG_ERROR([unable to find a python version >=3
 # pytest is needed for tests to run
 AX_PYTHON_MODULE([pytest])
 AC_PATH_PROGS([PYTEST], [pytest-3 pytest])
-
 AS_IF([test ${enable_venv:-no} = "yes"], [
 # venv is needed if installing in a virtural environment
 AX_PYTHON_MODULE([venv], [fatal])],[
@@ -58,7 +59,8 @@ AX_PYTHON_MODULE([venv], [fatal])],[
 AX_PYTHON_MODULE([numpypi], [fatal])
 AX_PYTHON_MODULE([netCDF4], [fatal])])
 AM_CONDITIONAL([RUN_PYTESTS], [test ${HAVE_PYMOD_PYTEST:-no} = "yes" || test ${enable_venv:-no} = "yes"])
-
+AM_COND_IF([RUN_PYTESTS], [],
+  [AC_MSG_NOTICE([Python tests will not be run with `make check`])])
 
 AC_CONFIG_FILES([
   Makefile
