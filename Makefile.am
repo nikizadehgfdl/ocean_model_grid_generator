@@ -24,13 +24,18 @@ SUBDIRS = t
 
 bin_SCRIPTS = ocean_grid_generator.py
 
+# Need to use python3 for the two `pip install`s to ensure the packages are
+# installed in the virtual env.
 if ENABLE_VENV
 install-exec-local:
 	$(PYTHON) -m venv $(DESTDIR)$(pkglibexecdir)
 	. $(DESTDIR)$(pkglibexecdir)/bin/activate && \
-	$(PYTHON) -m pip install git+https://github.com/adcroft/numpypi.git && \
-	$(PYTHON) -m pip install $(srcdir)
+	python3 -m pip install git+https://github.com/adcroft/numpypi.git && \
+	python3 -m pip install $(srcdir)
 
 install-exec-hook:
 	$(SED) -i -e "s|^#!/usr/bin/env python$$|#!$(pkglibexecdir)/bin/python|" $(DESTDIR)$(bindir)/ocean_grid_generator.py
+else
+install-exec-hook:
+	$(SED) -i -e "s|^#!/usr/bin/env python$$|#!$(PYTHON)|" $(DESTDIR)$(bindir)/ocean_grid_generator.py
 endif
