@@ -36,11 +36,14 @@ TESTS = \
 endif
 
 if ENABLE_VENV
+# venv-test installs a test virtual Python environment.
+# The last three calls to python3 are done this way to ensure
+# the python in the venv-test is used.
 venv-test:
-	python3 -m venv $(builddir)/venv-test
+	$(PYTHON) -m venv $(builddir)/venv-test
 	. $(builddir)/venv-test/bin/activate && \
 	python3 -m pip install pytest && \
-	python3 -m pip install git+https://github.com/underwoo/numpypi.git@pip.installable && \
+	python3 -m pip install git+https://github.com/adcroft/numpypi.git && \
 	python3 -m pip install $(top_srcdir)
 
 test_funcs.py: venv-test

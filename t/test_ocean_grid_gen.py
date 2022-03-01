@@ -5,6 +5,7 @@ import subprocess
 import hashlib
 import os
 import glob
+import sys
 
 my_srcdir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ogg_cmd = os.path.join(my_srcdir, "ocean_grid_generator.py")
@@ -16,12 +17,24 @@ def hashfile(f):
         sha256.update(file.read())
     return sha256.hexdigest()
 
-
+# Note, all calls to subprocess use `sys.executable` to ensure the Python
+# executable pytest uses is used.  This is to help isolate if the shebang
+# in ocean_grid_generatory.py points to a version that does not have
+# thre required python modules.
 class TestOGG:
     def test_hgrid_res4_0(self, tmpdir):
         outfile = tmpdir.join("ocean_hgrid_res4.0.nc")
         sp = subprocess.run(
-            [ogg_cmd, "-f", outfile, "-r", "0.25", "--ensure_nj_even", "--no_changing_meta"]
+            [
+                sys.executable,
+                ogg_cmd,
+                "-f",
+                outfile,
+                "-r",
+                "0.25",
+                "--ensure_nj_even",
+                "--no_changing_meta"
+            ]
         )
         assert sp.returncode == 0
         assert (
@@ -33,6 +46,7 @@ class TestOGG:
         outfile = tmpdir.join("ocean_hgrid_res1.0.nc")
         sp = subprocess.run(
             [
+                sys.executable,
                 ogg_cmd,
                 "-f",
                 outfile,
@@ -51,7 +65,17 @@ class TestOGG:
 
     def test_hgrid_res0_5(self, tmpdir):
         outfile = tmpdir.join("ocean_hgrid_res0.5.nc")
-        sp = subprocess.run([ogg_cmd, "-f", outfile, "-r", "2", "--no_changing_meta"])
+        sp = subprocess.run(
+            [
+                sys.executable,
+                ogg_cmd,
+                "-f",
+                outfile,
+                "-r",
+                "2",
+                "--no_changing_meta"
+            ]
+        )
         assert sp.returncode == 0
         assert (
             hashfile(outfile)
@@ -62,6 +86,7 @@ class TestOGG:
         outfile = tmpdir.join("ocean_hgrid_res0.5_equenh.nc")
         sp = subprocess.run(
             [
+                sys.executable,
                 ogg_cmd,
                 "-f",
                 outfile,
@@ -84,6 +109,7 @@ class TestOGG:
         outfile = tmpdir.join("ocean_hgrid_res0.25.nc")
         sp = subprocess.run(
             [
+                sys.executable,
                 ogg_cmd,
                 "-f",
                 outfile,
