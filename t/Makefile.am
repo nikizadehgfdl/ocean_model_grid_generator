@@ -42,6 +42,7 @@ if ENABLE_VENV
 venv-test:
 	$(PYTHON) -m venv $(builddir)/venv-test
 	. $(builddir)/venv-test/bin/activate && \
+	python3 -m pip install --upgrade pip && \
 	python3 -m pip install pytest && \
 	python3 -m pip install git+https://github.com/adcroft/numpypi.git && \
 	python3 -m pip install $(top_srcdir)
