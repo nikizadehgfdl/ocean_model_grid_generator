@@ -30,6 +30,7 @@ if ENABLE_VENV
 install-exec-local:
 	$(PYTHON) -m venv $(DESTDIR)$(pkglibexecdir)
 	. $(DESTDIR)$(pkglibexecdir)/bin/activate && \
+	python3 -m pip install --upgrade pip && \
 	python3 -m pip install git+https://github.com/adcroft/numpypi.git && \
 	python3 -m pip install $(srcdir)
 
