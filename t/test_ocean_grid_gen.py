@@ -39,7 +39,9 @@ class TestOGG:
         assert sp.returncode == 0
         assert (
             hashfile(outfile)
-            == "47f5fc42e7f598f1d339c15e7fc88dc1d7b03956898294f4f185fe17b0a0f31d"
+            == "47f5fc42e7f598f1d339c15e7fc88dc1d7b03956898294f4f185fe17b0a0f31d" #PAN
+            or hashfile(outfile)
+            == "7e04457b4411260341f304a5182ec7f289ddb2724021e2825751f9994e23a6ed" #githubCI
         )
 
     def test_hgrid_res1_0(self, tmpdir):
@@ -60,7 +62,9 @@ class TestOGG:
         assert sp.returncode == 0
         assert (
             hashfile(outfile)
-            == "bb57a86b788cb27c71ad139b5c72892fbe7019ffe774ecce4c0d74de54e678dc"
+            == "bb57a86b788cb27c71ad139b5c72892fbe7019ffe774ecce4c0d74de54e678dc" #PAN 
+            or hashfile(outfile)
+            == "ec24bbb7fd8b076d4d566777d2a924c4c6ac8f45bdf5b55c94eaeaa12ab07cbf" #githubCI
         )
 
     def test_hgrid_res0_5(self, tmpdir):
@@ -79,7 +83,9 @@ class TestOGG:
         assert sp.returncode == 0
         assert (
             hashfile(outfile)
-            == "87b29a240aa1ea9dbcce7d718a13704fa96b098650acbd99e4376884c35c4c83"
+            == "87b29a240aa1ea9dbcce7d718a13704fa96b098650acbd99e4376884c35c4c83" #PAN
+            or hashfile(outfile)
+            == "b2e8bbf65da5aa1de011119a269f4b3f236bf62ebe14778f1f458b552a1c1a9d" #githubCI
         )
 
     def test_hgrid_res0_5_equenh(self, tmpdir):
@@ -102,7 +108,9 @@ class TestOGG:
         assert sp.returncode == 0
         assert (
             hashfile(outfile)
-            == "683a42d5a155620456635dac57a2a6789058fd2a496feafb05db5b2c6015e754"
+            == "683a42d5a155620456635dac57a2a6789058fd2a496feafb05db5b2c6015e754" #PAN
+            or hashfile(outfile)
+            == "30a040b8fbdf0683cc50d8ac2be841bb81f3f681e3b0c1a274f841e6fbd47d44" #githubCI
         )
 
     def test_hgrid_res0_25(self, tmpdir):
@@ -129,6 +137,8 @@ class TestOGG:
             == "12185aed9f1814c6b3c1545158338ee4160da96e2c9f389ffc31e1d3ed8c76ca"  # gfdl-pan106,pan105
             or hashfile(outfile)
             == "2d7840344aa356feb282d352bf21cce8832947b7989534290bd24d30dc561b70"  # github,gfdl-pan202
+            or hashfile(outfile)
+            == "20315d58d80747559ed069fff521511624fed778ab92df6f9764503b79a15eea"  # githubCI
         )
 
 
