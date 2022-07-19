@@ -1785,54 +1785,54 @@ def main(
         #      If the sub-grids are disjoint, 1 and 2 introduce a jump in y1 at the joint,
         #      as a result y1 and dy1 may become inconsistent?
         #
+        # Cut the grid at south according to the options!
+        # We may need to cut the whole SC grid and some of the SO
+        cut = False
+        jcut = 0
+        cats = 0
+        if south_cutoff_row > 0:
+            cut = True
+            jcut = south_cutoff_row - 1
+        elif south_cutoff_ang > -90:
+            cut = True
+            jcut = 1 + np.nonzero(phiSC[:, 0] < south_cutoff_ang)[0][-1]
+
+        if cut:
+            if hasSC and jcut < lamSC.shape[0]:  # only SC needs to be cut
+                print("   SC: shape[0], jcut", lamSC.shape[0], jcut)
+                if (phiSC.shape[0] - jcut) % 2 == 0 and ensure_nj_even:
+                    # if((areaSC.shape[0]-jcut-1)%2 == 0 and ensure_nj_even):
+                    print(
+                        "   SC: The number of j's is not even. Fixing this by cutting one row at south."
+                    )
+                    jcut = jcut + 1
+                print("   Cutting SC grid rows 0 to ", jcut)
+                lamSC = lamSC[jcut:, :]
+                phiSC = phiSC[jcut:, :]
+                dxSC = dxSC[jcut:, :]
+                dySC = dySC[jcut:, :]
+                areaSC = areaSC[jcut:, :]
+                angleSC = angleSC[jcut:, :]
+            elif hasSO:
+                print("   Whole SC and some of SO need to be cut!")
+                print("   SO: shape[0], jcut", lamSO.shape[0], jcut)
+                hasSC = False
+                jcut_SO = jcut - lamSC.shape[0]
+                #                    jcut_SO = max(jcut-lamSC.shape[0], 1 + np.nonzero(phiSO[:,0] < south_cutoff_ang)[0][-1])
+                if (areaSO.shape[0] - jcut_SO - 1) % 2 == 0 and ensure_nj_even:
+                    print(
+                        "   SO: The number of j's is not even. Fixing this by cutting one row at south."
+                    )
+                    jcut_SO = jcut_SO + 1
+                print("   No SC grid remained. Cutting SO grid rows 0 to ", jcut_SO)
+                lamSO = lamSO[jcut_SO:, :]
+                phiSO = phiSO[jcut_SO:, :]
+                dxSO = dxSO[jcut_SO:, :]
+                dySO = dySO[jcut_SO:, :]
+                areaSO = areaSO[jcut_SO:, :]
+                angleSO = angleSO[jcut_SO:, :]
+
         if match_dy or not "all" in grids:
-            # Cut the grid at south according to the options!
-            # We may need to cut the whole SC grid and some of the SO
-            cut = False
-            jcut = 0
-            cats = 0
-            if south_cutoff_row > 0:
-                cut = True
-                jcut = south_cutoff_row - 1
-            elif south_cutoff_ang > -90:
-                cut = True
-                jcut = 1 + np.nonzero(phiSC[:, 0] < south_cutoff_ang)[0][-1]
-
-            if cut:
-                if hasSC and jcut < lamSC.shape[0]:  # only SC needs to be cut
-                    print("   SC: shape[0], jcut", lamSC.shape[0], jcut)
-                    if (phiSC.shape[0] - jcut) % 2 == 0 and ensure_nj_even:
-                        # if((areaSC.shape[0]-jcut-1)%2 == 0 and ensure_nj_even):
-                        print(
-                            "   SC: The number of j's is not even. Fixing this by cutting one row at south."
-                        )
-                        jcut = jcut + 1
-                    print("   Cutting SC grid rows 0 to ", jcut)
-                    lamSC = lamSC[jcut:, :]
-                    phiSC = phiSC[jcut:, :]
-                    dxSC = dxSC[jcut:, :]
-                    dySC = dySC[jcut:, :]
-                    areaSC = areaSC[jcut:, :]
-                    angleSC = angleSC[jcut:, :]
-                elif hasSO:
-                    print("   Whole SC and some of SO need to be cut!")
-                    print("   SO: shape[0], jcut", lamSO.shape[0], jcut)
-                    hasSC = False
-                    jcut_SO = jcut - lamSC.shape[0]
-                    #                    jcut_SO = max(jcut-lamSC.shape[0], 1 + np.nonzero(phiSO[:,0] < south_cutoff_ang)[0][-1])
-                    if (areaSO.shape[0] - jcut_SO - 1) % 2 == 0 and ensure_nj_even:
-                        print(
-                            "   SO: The number of j's is not even. Fixing this by cutting one row at south."
-                        )
-                        jcut_SO = jcut_SO + 1
-                    print("   No SC grid remained. Cutting SO grid rows 0 to ", jcut_SO)
-                    lamSO = lamSO[jcut_SO:, :]
-                    phiSO = phiSO[jcut_SO:, :]
-                    dxSO = dxSO[jcut_SO:, :]
-                    dySO = dySO[jcut_SO:, :]
-                    areaSO = areaSO[jcut_SO:, :]
-                    angleSO = angleSO[jcut_SO:, :]
-
             if hasSC and hasSO:
                 x1 = np.concatenate((lamSC[:-1, :], lamSO), axis=0)
                 y1 = np.concatenate((phiSC[:-1, :], phiSO), axis=0)
@@ -1928,26 +1928,6 @@ def main(
             dy3 = np.concatenate((dy2, dyBP), axis=0)
             area3 = np.concatenate((area2, areaBP), axis=0)
             angle3 = np.concatenate((angle2, angleBP), axis=0)
-
-            if south_cutoff_row > 0:
-                jcut = south_cutoff_row - 1
-                print("cutting grid rows 0 to ", jcut)
-                x3 = x3[jcut:, :]
-                y3 = y3[jcut:, :]
-                dx3 = dx3[jcut:, :]
-                dy3 = dy3[jcut:, :]
-                area3 = area3[jcut:, :]
-                angle3 = angle3[jcut:, :]
-
-            if south_cutoff_ang > -90:
-                jcut = 1 + np.nonzero(y3[:, 0] < south_cutoff_ang)[0][-1]
-                print("cutting grid below ", south_cutoff_ang, jcut)
-                x3 = x3[jcut:, :]
-                y3 = y3[jcut:, :]
-                dx3 = dx3[jcut:, :]
-                dy3 = dy3[jcut:, :]
-                area3 = area3[jcut:, :]
-                angle3 = angle3[jcut:, :]
 
         dy3_ = np.roll(y3[:, Ni // 4], shift=-1, axis=0) - y3[:, Ni // 4]
         if np.any(dy3_ == 0):
