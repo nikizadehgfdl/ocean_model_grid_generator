@@ -8,9 +8,9 @@ To test this module quickly try
 - cd extras ; make -f Makefile.examples quick
 
 Examples:
-- To build a grid consisting a regular spherical grid between 50S and 70S, stitched with  a displaced pole cap south of 70S with the south pole displaced to (60E,50S):
+- To build a grid consisting a 1/2 degree regular spherical grid between 50S and 70S, stitched with  a displaced pole cap south of 70S with the south pole displaced to (60E,50S):
  
-  ocean_grid_generator.py -f 4 --south_cutoff_row 22 --write_subgrid_files --plot --gridlist=sc,so  --no-metrics --londp 60.0 --latdp -85.85702261518855 --south_cap_lat -70. --south_ocean_upper_lat -50.
+  ocean_grid_generator.py -r 2  --south_ocean_upper_lat -50 --south_cap_lat -70 --lon_dp 60.0 --lat_dp -85.85 --grids so sc [--skip_metrics --plot] 
 
 [Technical guide](https://github.com/nikizadehgfdl/grid_generation/blob/dev/ocean_grid_generator_guide.pdf)
 

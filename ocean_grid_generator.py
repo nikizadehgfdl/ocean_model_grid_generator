@@ -1020,7 +1020,6 @@ def main(
     hasMerc = False
     hasSO = False
     hasSC = False
-    stitch = True
 
     # Exit if mutually exclusive arguments are provided
     if r_dp != 0.0 and lat_dp > -90.0:
@@ -1429,6 +1428,7 @@ def main(
             )
 
     if (Nj_SO != 0) and ("so" in grids or "all" in grids):
+        hasSO=True
         ###
         ###Southern Ocean grid
         ###
@@ -1522,6 +1522,7 @@ def main(
         ###
         ###Southern cap
         ###
+        hasSC=True
         if r_dp == 0.0 and lat_dp < -90.0:
             fullArc = lat0_SC + 90.0
             Nj_scap = int(fullArc / deltaPhiSO)
@@ -1760,10 +1761,17 @@ def main(
                     lamSO, phiSO, stride=int(refineR * 10), newfig=False, axis=ax
                 )
 
-    hasSC = Nj_scap > 0
-    hasSO = Nj_SO > 0
-
     # Concatenate to generate the whole grid
+    stitch = False
+    if(hasSC and hasSO): 
+        stitch=True
+        print("hasSC and hasSO")
+    if(hasSO and hasMerc): 
+        stitch=True
+        print("hasMerc and hasSO")
+    if(hasBP and hasMerc): 
+        stitch=True
+        print("hasMerc and hasBP")
     if stitch:
         # Start from displaced southern cap and join the southern ocean grid
         print("Stitching the grids together...")
