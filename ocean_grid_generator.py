@@ -323,7 +323,7 @@ def generate_mercator_grid(
     refineR,
     shift_equator_to_u_point=True,
     ensure_nj_even=True,
-    enhanced_equatorial=False,
+    enhanced_equatorial=0,
 ):
     print("Requesting Mercator grid with phi range: phi_s,phi_n=", phi_s, phi_n)
     # Diagnose nearest integer y(phi range)
@@ -387,12 +387,24 @@ def generate_mercator_grid(
             N_enh = 55
             dphi_e = -phi_enh_d / N_enh / 0.981
 
-        j_c0d = np.where(phi_M < phi_enh_d)[0][
-            -1
-        ]  # The last index with phi_M<phi_enh_d
-        j_phi_cub_d = np.where(phi_M < phi_cub_d)[0][
-            -1
-        ]  # The last index with phi_M<phi_cub_d
+        if refineR == 4 and enhanced_equatorial==8:
+            #1/8 degree refine 
+            phi_enh_d = -10
+            N_enh = 2*enhanced_equatorial * abs(phi_enh_d)+1 #161 
+            phi_cub_d = -20
+            N_cub = 101
+            dphi_e = -phi_enh_d / N_enh
+
+        if refineR == 4 and enhanced_equatorial==6:
+            #1/6 degree refine 
+            phi_enh_d = -10
+            N_enh = 2*enhanced_equatorial * abs(phi_enh_d)+1 #121 
+            phi_cub_d = -20
+            N_cub = 101  #What determines this?
+            dphi_e = -phi_enh_d / N_enh
+
+        j_c0d = np.where(phi_M < phi_enh_d)[0][-1]        # The last index with phi_M<phi_enh_d
+        j_phi_cub_d = np.where(phi_M < phi_cub_d)[0][-1]  # The last index with phi_M<phi_cub_d
         dphi = phi_M[1:] - phi_M[0:-1]
 
         cubic_lagrange_interp = True
@@ -988,7 +1000,7 @@ def main(
     write_subgrid_files=False,
     plotem=False,
     no_changing_meta=False,
-    enhanced_equatorial=False,
+    enhanced_equatorial=0,
     debug=False,
     grids=["bipolar", "mercator", "so", " sc", "all"],
     skip_metrics=False,
@@ -1133,6 +1145,8 @@ def main(
     ###
     # To get the same number of points as existing 1/4 degree grids that were generated with MIDAS
     Nj_scap = int(refineR * 40)
+    if no_south_cap:
+       Nj_scap = 0
     if refineR == 1 and enhanced_equatorial:  # SPEAR
         Nj_scap = 0
     # Refine the grid by a factor and then exclude the inner circle corresponding to that factor
@@ -1901,7 +1915,9 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--enhanced_equatorial",
-        action="store_true",
+        type=int,
+        required=False,
+        default=0,
         help="",
     )
 
