@@ -102,7 +102,7 @@ class TestOGG:
                 "130",
                 "--no_changing_meta",
                 "--write_subgrid_files",
-                "--enhanced_equatorial",
+                "--enhanced_equatorial=4",
             ]
         )
         assert sp.returncode == 0
@@ -138,7 +138,8 @@ class TestOGG:
             or hashfile(outfile)
             == "2d7840344aa356feb282d352bf21cce8832947b7989534290bd24d30dc561b70"  # github,gfdl-pan202
             or hashfile(outfile)
-            == "20315d58d80747559ed069fff521511624fed778ab92df6f9764503b79a15eea"  # githubCI
+            == "1a0c3ca0e5b71ebdb8c68c63b2134c48a4bc8d9b9c9ba32f7298171a315d9508"  # githubCI
+            #== "20315d58d80747559ed069fff521511624fed778ab92df6f9764503b79a15eea"  # githubCI old
         )
 
 
