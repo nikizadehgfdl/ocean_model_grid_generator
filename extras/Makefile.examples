@@ -19,7 +19,7 @@ all: $(TARGS) hash.md5
 	md5sum -c hash.md5
 
 quick : $(QUICKTARGS) 
-	head -4 hash.md5 > hash.md5.quick
+	head -5 hash.md5 > hash.md5.quick
 	md5sum -c hash.md5.quick
 
 #Note: --no_changing_meta arg is used to avoid putting time/platform dependent info in the files so that they can  be checksumed.
@@ -31,7 +31,7 @@ ocean_hgrid_res1.0.nc:
 ocean_hgrid_res0.5.nc: 
 	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.5.nc -r 2    --write_subgrid_files --no_changing_meta 
 ocean_hgrid_res0.5_equenh.nc: 
-	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --south_cutoff_row 130 --no_changing_meta --write_subgrid_files --enhanced_equatorial
+	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --south_cutoff_row 130 --no_changing_meta --write_subgrid_files --enhanced_equatorial=4
 ocean_hgrid_res0.25.nc:
 	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.25.nc -r 4 --r_dp 0.2 --south_cutoff_row 83 --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.125.nc:
