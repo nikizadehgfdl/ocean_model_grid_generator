@@ -15,7 +15,7 @@ jobs:
     - name: Install numpypi
       run: python3 -m pip install git+https://github.com/adcroft/numpypi.git
     - name: Install netCDF4 dependencies
-      run: sudo apt-get install libhdf5-serial-dev netcdf-bin libhdf5-dev libnetcf-dev
+      run: sudo apt-get install libhdf5-serial-dev netcdf-bin libhdf5 libnetcf
     - name: Install netCDF4
       run: python3 -m pip install netCDF4
     - name: ocean_grid_generator test
