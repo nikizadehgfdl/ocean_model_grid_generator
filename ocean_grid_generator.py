@@ -26,14 +26,8 @@ def chksum(x, lbl):
         y[:] = x
     ymin, ymax, ymean = y.min(), y.max(), y.mean()
     ysd = np.sqrt(((y - ymean) ** 2).mean())
-    print(
-        hashlib.sha256(y).hexdigest(),
-        "%10s" % lbl,
-        "min = %.15f" % ymin,
-        "max = %.15f" % ymax,
-        "mean = %.15f" % ymean,
-        "sd = %.15f" % ysd,
-    )
+    print(hashlib.sha256(y).hexdigest(),"%10s" % lbl,
+        "min = %.15f" % ymin,"max = %.15f" % ymax,"mean = %.15f" % ymean,"sd = %.15f" % ysd)
 
 
 def bipolar_projection(lamg, phig, lon_bp, rp, metrics_only=False):
@@ -61,18 +55,12 @@ def bipolar_projection(lamg, phig, lon_bp, rp, metrics_only=False):
         ##We have to pickup the "correct" root.
         ##One way is simply to demand lamc to be continuous with lam on the equator phi=0
         ##I am sure there is a more mathematically concrete way to do this.
-        lamc = np.where((lamg - lon_bp > 90) & (lamg - lon_bp <= 180), 180 - lamc, lamc)
-        lamc = np.where(
-            (lamg - lon_bp > 180) & (lamg - lon_bp <= 270), 180 + lamc, lamc
-        )
+        lamc = np.where((lamg - lon_bp > 90)  & (lamg - lon_bp <= 180), 180 - lamc, lamc)
+        lamc = np.where((lamg - lon_bp > 180) & (lamg - lon_bp <= 270), 180 + lamc, lamc)
         lamc = np.where((lamg - lon_bp > 270), 360 - lamc, lamc)
         # Along symmetry meridian choose lamc
-        lamc = np.where(
-            (lamg - lon_bp == 90), 90, lamc
-        )  # Along symmetry meridian choose lamc=90-lon_bp
-        lamc = np.where(
-            (lamg - lon_bp == 270), 270, lamc
-        )  # Along symmetry meridian choose lamc=270-lon_bp
+        lamc = np.where((lamg - lon_bp == 90), 90, lamc)   # Along symmetry meridian choose lamc=90-lon_bp
+        lamc = np.where((lamg - lon_bp == 270), 270, lamc) # Along symmetry meridian choose lamc=270-lon_bp
         lams = lamc + lon_bp
 
     ##Project back onto the larger (true) sphere so that the projected equator shrinks to latitude \phi_P=lat0_tp
@@ -209,14 +197,10 @@ def quad_positions(n=3):
         return np.array([0.0, 0.5, 1.0]), np.array([1.0, 0.5, 0.0])
     if n == 4:
         r5 = 0.5 / np.sqrt(5.0)
-        return np.array([0.0, 0.5 - r5, 0.5 + r5, 1.0]), np.array(
-            [1.0, 0.5 + r5, 0.5 - r5, 0.0]
-        )
+        return np.array([0.0, 0.5 - r5, 0.5 + r5, 1.0]), np.array([1.0, 0.5 + r5, 0.5 - r5, 0.0])
     if n == 5:
         r37 = 0.5 * np.sqrt(3.0 / 7.0)
-        return np.array([0.0, 0.5 - r37, 0.5, 0.5 + r37, 1.0]), np.array(
-            [1.0, 0.5 + r37, 0.5, 0.5 - r37, 0.0]
-        )
+        return np.array([0.0, 0.5 - r37, 0.5, 0.5 + r37, 1.0]), np.array([1.0, 0.5 + r37, 0.5, 0.5 - r37, 0.0])
     raise Exception("Uncoded order")
 
 
@@ -249,20 +233,10 @@ def quad_average_2d(y):
         return d * d * (y[0, 0] + y[0, 1] + y[1, 0] + y[1, 1])
     if y.shape[0] == 3:  # 1/3, 4/3, 1/3
         d = 1.0 / 6.0
-        return (
-            d
-            * d
-            * (
-                y[0, 0]
-                + y[0, 2]
-                + y[2, 0]
-                + y[2, 2]
-                + 4.0 * (y[0, 1] + y[1, 0] + y[1, 2] + y[2, 1] + 4.0 * y[1, 1])
-            )
-        )
+        return (d*d *  (y[0, 0] + y[0, 2] + y[2, 0] + y[2, 2]
+                        + 4.0 * (y[0, 1] + y[1, 0] + y[1, 2] + y[2, 1] + 4.0 * y[1, 1])))
     if y.shape[0] == 4:  # 1/6, 5/6, 5/6, 1/6
         d = 1.0 / 12.0
-        #       return d * ( 5. * ( y[1] + y[2] ) + ( y[0] + y[3] ) )
         w = np.array([1.0, 5.0, 5.0, 1.0])
         ysum = 0.0
         for j in range(0, y.shape[0]):
@@ -271,7 +245,6 @@ def quad_average_2d(y):
         return d * d * ysum
     if y.shape[0] == 5:  # 9/10, 49/90, 64/90, 49/90, 9/90
         d = 1.0 / 180.0
-        # return d * ( 64.* y[2] + ( 49. * ( y[1] + y[3] ) )  + 9. * ( y[0] + y[4] ) )
         w = np.array([9.0, 49.0, 64.0, 49.0, 9.0])
         ysum = 0.0
         for j in range(0, y.shape[0]):
@@ -296,6 +269,25 @@ def lagrange_interp(x, y, q):
     d3 = (x[3] - x[0]) * (x[3] - x[1]) * (x[3] - x[2])
     return ((n0 / d0) * y[0] + (n3 / d3) * y[3]) + ((n1 / d1) * y[1] + (n2 / d2) * y[2])
 
+def lagrange_interp_6pt(x, y, q):
+    """Lagrange polynomial interpolation. Retruns f(q) which f(x) passes through four data
+    points at x[0..5], y[0..5]."""
+    # n - numerator, d - denominator
+    n0 = (q - x[1]) * (q - x[2]) * (q - x[3]) * (q - x[4]) * (q - x[5])
+    d0 = (x[0] - x[1]) * (x[0] - x[2]) * (x[0] - x[3]) * (x[0] - x[4]) * (x[0] - x[5])
+    n1 = (q - x[0]) * (q - x[2]) * (q - x[3]) * (q - x[4]) * (q - x[5])
+    d1 = (x[1] - x[0]) * (x[1] - x[2]) * (x[1] - x[3]) * (x[1] - x[4]) * (x[1] - x[5])
+    n2 = (q - x[0]) * (q - x[1]) * (q - x[3]) * (q - x[4]) * (q - x[5])
+    d2 = (x[2] - x[0]) * (x[2] - x[1]) * (x[2] - x[3]) * (x[2] - x[4]) * (x[2] - x[5])
+    n3 = (q - x[0]) * (q - x[1]) * (q - x[2]) * (q - x[4]) * (q - x[5])
+    d3 = (x[3] - x[0]) * (x[3] - x[1]) * (x[3] - x[2]) * (x[3] - x[4]) * (x[3] - x[5])
+    n4 = (q - x[0]) * (q - x[1]) * (q - x[2]) * (q - x[3]) * (q - x[5])
+    d4 = (x[4] - x[0]) * (x[4] - x[1]) * (x[4] - x[2]) * (x[4] - x[3]) * (x[4] - x[5])
+    n5 = (q - x[0]) * (q - x[1]) * (q - x[2]) * (q - x[3]) * (q - x[4])
+    d5 = (x[5] - x[0]) * (x[5] - x[1]) * (x[5] - x[2]) * (x[5] - x[3]) * (x[5] - x[4])
+
+    return ((n0 / d0) * y[0] + (n5 / d5) * y[5]) + ((n1 / d1) * y[1] + (n4 / d4) * y[4]) + ((n2 / d2) * y[2] + (n3 / d3) * y[3])
+
 
 def y_mercator(Ni, phi):
     """Equation (1)"""
@@ -314,17 +306,8 @@ def y_mercator_rounded(Ni, phi):
     return (np.sign(y_float) * np.round_(np.abs(y_float))).astype(int)
 
 
-def generate_mercator_grid(
-    Ni,
-    phi_s,
-    phi_n,
-    lon0_M,
-    lenlon_M,
-    refineR,
-    shift_equator_to_u_point=True,
-    ensure_nj_even=True,
-    enhanced_equatorial=0,
-):
+def generate_mercator_grid(Ni, phi_s, phi_n, lon0_M, lenlon_M, refineR,
+    shift_equator_to_u_point=True, ensure_nj_even=True, enhanced_equatorial=0):
     print("Requesting Mercator grid with phi range: phi_s,phi_n=", phi_s, phi_n)
     # Diagnose nearest integer y(phi range)
     y_star = y_mercator_rounded(Ni, np.array([phi_s * PI_180, phi_n * PI_180]))
@@ -344,10 +327,7 @@ def generate_mercator_grid(
             print("  *Fixing this by shifting the y_star[1] ")
             y_star[1] = y_star[1] - 1
     Nj = y_star[1] - y_star[0]
-    print(
-        "   Generating Mercator grid with phi range: phi_s,phi_n=",
-        phi_mercator(Ni, y_star),
-    )
+    print("   Generating Mercator grid with phi range: phi_s,phi_n=", phi_mercator(Ni, y_star))
     phi_M = phi_mercator(Ni, np.arange(y_star[0], y_star[1] + 1))
 
     # Ensure that the equator (y=0) is included and is a u-point
@@ -363,6 +343,9 @@ def generate_mercator_grid(
 
     if enhanced_equatorial:
         print("   Enhancing the equator region resolution")
+        lagrange_interp_4pts = True
+        lagrange_interp_6pts = False
+
         # Enhance the lattitude resolution between 30S and 30N
         # Set a constant high res lattitude grid spanning 10 degrees centered at the Equator.
         # This construction makes the whole Mercator subgrid symmetric around the Equator.
@@ -371,14 +354,10 @@ def generate_mercator_grid(
         phi_enh_d = -5.0  # Starting lattitude of enhanced resolution grid
         phi_cub_d = -30  # Starting lattitude of cubic interpolation
 
-        N_cub = (
-            132 * refineR / 2
-        )  # Number of points in the cubic interpolation for one shoulder
+        N_cub = 132 * refineR / 2  # Number of points in the cubic interpolation for one shoulder
         # MIDAS has 130, but 132 produces a result closer to 1/2 degree MIDAS grid
         dphi_e = 0.13 * 2 / refineR  # Enhanced resolution 10 degrees around the equator
-        N_enh = (
-            40 * refineR / 2
-        )  # Number of points in the enhanced resolution below equator
+        N_enh = 40 * refineR / 2   # Number of points in the enhanced resolution below equator
 
         if refineR == 1 and enhanced_equatorial:  # Closest to SPEAR grid
             phi_enh_d = -10
@@ -394,6 +373,8 @@ def generate_mercator_grid(
             phi_cub_d = -20
             N_cub = 101
             dphi_e = -phi_enh_d / N_enh
+            lagrange_interp_4pts = False
+            lagrange_interp_6pts = True
 
         if refineR == 4 and enhanced_equatorial==6:
             #1/6 degree refine 
@@ -407,43 +388,23 @@ def generate_mercator_grid(
         j_phi_cub_d = np.where(phi_M < phi_cub_d)[0][-1]  # The last index with phi_M<phi_cub_d
         dphi = phi_M[1:] - phi_M[0:-1]
 
-        cubic_lagrange_interp = True
-        cubic_scipy = False
-
         phi1 = phi_M[0:j_phi_cub_d]
-        phi_s = phi_M[j_phi_cub_d - 1]
-        dphi_s = phi_M[j_phi_cub_d] - phi_M[j_phi_cub_d - 1]
         phi_e = phi_enh_d
-
-        nodes = [0, 1, N_cub - 2, N_cub - 1]
-        phi_nodes = [phi_s, phi_s + dphi_s, phi_e - dphi_e, phi_e]
-        q = np.arange(N_cub)
-
-        #cubic_lagrange_interp:
-        phi2 = lagrange_interp(nodes, phi_nodes, q)
-
-        print(
-            "   Meridional range of pure Mercator=(",
-            phi1[0],
-            ",",
-            phi1[-2],
-            ") U (",
-            -phi1[-2],
-            ",",
-            -phi1[0],
-            ").",
-        )
-        print(
-            "   Meridional range of cubic interpolation=(",
-            phi2[0],
-            ",",
-            phi2[-2],
-            ") U (",
-            -phi2[-2],
-            ",",
-            -phi2[0],
-            ").",
-        )
+        if lagrange_interp_4pts:
+           nodes = [0, 1, N_cub - 2, N_cub - 1]
+           phi_nodes = [phi_M[j_phi_cub_d-1], phi_M[j_phi_cub_d], phi_e - dphi_e, phi_e]
+           q = np.arange(N_cub)
+           phi2 = lagrange_interp(nodes, phi_nodes, q)
+        elif lagrange_interp_6pts:
+           N_cub = 111
+           nodes = [0, 1, 2, N_cub - 3, N_cub - 2, N_cub - 1]
+           phi_nodes = [phi_M[j_phi_cub_d-1], phi_M[j_phi_cub_d], phi_M[j_phi_cub_d+1] ,
+                        phi_e-dphi_e, phi_e, phi_e+dphi_e]
+           q = np.arange(N_cub)
+           phi2 = lagrange_interp_6pt(nodes, phi_nodes, q)
+    
+        print("   Meridional range of pure Mercator=(", phi1[0], ",", phi1[-2], ") U (", -phi1[-2], ",", -phi1[0], ").")
+        print("   Meridional range of cubic interpolation=(", phi2[0], ",", phi2[-2], ") U (", -phi2[-2], ",",-phi2[0],").")
         phi3 = np.concatenate((phi1[0:-1], phi2))
 
         phi_s = phi3[-1]
@@ -466,9 +427,7 @@ def generate_mercator_grid(
     x_grid_M = np.tile(lam_M, (Nj + 1, 1))
     # Double check is necessary for enhanced_equatorial
     if y_grid_M.shape[0] % 2 == 0 and ensure_nj_even:
-        print(
-            "   The number of j's is not even. Fixing this by cutting one row at south."
-        )
+        print("   The number of j's is not even. Fixing this by cutting one row at south.")
         y_grid_M = np.delete(y_grid_M, 0, 0)
         x_grid_M = np.delete(x_grid_M, 0, 0)
     print("   Final Mercator grid range=", y_grid_M[0, 0], y_grid_M[-1, 0])
@@ -521,9 +480,7 @@ def displacedPoleCap_baseGrid(i, j, ni, nj, lon0, lat0):
     return u, v, du, dv
 
 
-def displacedPoleCap_mesh(
-    i, j, ni, nj, lon0, lat0, lam_pole, r_pole, excluded_fraction=None
-):
+def displacedPoleCap_mesh(i, j, ni, nj, lon0, lat0, lam_pole, r_pole, excluded_fraction=None):
 
     long, latg, du, dv = displacedPoleCap_baseGrid(i, j, ni, nj, lon0, lat0)
     lamg = np.tile(long, (latg.shape[0], 1))
@@ -576,14 +533,10 @@ def numerical_hi(j, i, nx, ny, lon0, lat0, lon_dp, r_dp, eps, order=6):
     ds2 = great_arc_distance(j, i + eps, j, i - eps, nx, ny, lon0, lat0, lon_dp, r_dp)
     if order == 2:
         return 0.5 * ds2 * reps
-    ds4 = great_arc_distance(
-        j, i + 2.0 * eps, j, i - 2.0 * eps, nx, ny, lon0, lat0, lon_dp, r_dp
-    )
+    ds4 = great_arc_distance(j, i + 2.0 * eps, j, i - 2.0 * eps, nx, ny, lon0, lat0, lon_dp, r_dp)
     if order == 4:
         return (8.0 * ds2 - ds4) * (1.0 / 12.0) * reps
-    ds6 = great_arc_distance(
-        j, i + 3.0 * eps, j, i - 3.0 * eps, nx, ny, lon0, lat0, lon_dp, r_dp
-    )
+    ds6 = great_arc_distance(j, i + 3.0 * eps, j, i - 3.0 * eps, nx, ny, lon0, lat0, lon_dp, r_dp)
     if order == 6:
         return (45.0 * ds2 - 9.0 * ds4 + ds6) * (1.0 / 60.0) * reps
     raise Exception("order not coded")
@@ -595,22 +548,16 @@ def numerical_hj(j, i, nx, ny, lon0, lat0, lon_dp, r_dp, eps, order=6):
     ds2 = great_arc_distance(j + eps, i, j - eps, i, nx, ny, lon0, lat0, lon_dp, r_dp)
     if order == 2:
         return 0.5 * ds2 * reps
-    ds4 = great_arc_distance(
-        j + 2.0 * eps, i, j - 2.0 * eps, i, nx, ny, lon0, lat0, lon_dp, r_dp
-    )
+    ds4 = great_arc_distance(j + 2.0 * eps, i, j - 2.0 * eps, i, nx, ny, lon0, lat0, lon_dp, r_dp)
     if order == 4:
         return (8.0 * ds2 - ds4) * (1.0 / 12.0) * reps
-    ds6 = great_arc_distance(
-        j + 3.0 * eps, i, j - 3.0 * eps, i, nx, ny, lon0, lat0, lon_dp, r_dp
-    )
+    ds6 = great_arc_distance(j + 3.0 * eps, i, j - 3.0 * eps, i, nx, ny, lon0, lat0, lon_dp, r_dp)
     if order == 6:
         return (45.0 * ds2 - 9.0 * ds4 + ds6) * (1.0 / 60.0) * reps
     raise Exception("order not coded")
 
 
-def displacedPoleCap_metrics_quad(
-    order, nx, ny, lon0, lat0, lon_dp, r_dp, Re=_default_Re
-):
+def displacedPoleCap_metrics_quad(order, nx, ny, lon0, lat0, lon_dp, r_dp, Re=_default_Re):
     print("   Calculating displaced pole cap metrics via quadrature ...")
     a, b = quad_positions(order)
     # Note that we need to include the index of the last point of the grid to do the quadrature correctly.
@@ -739,9 +686,7 @@ def plot_mesh_in_xyz(
     )
 
 
-def displacedPoleCap_plot(
-    x_s, y_s, lon0, lon_dp, lat0, stride=40, block=False, dplat=None
-):
+def displacedPoleCap_plot(x_s, y_s, lon0, lon_dp, lat0, stride=40, block=False, dplat=None):
     #import cartopy.crs as ccrs
     import matplotlib.pyplot as plt
 
@@ -763,9 +708,7 @@ def mdist(x1, x2):
     return np.minimum(np.mod(x1 - x2, 360.0), np.mod(x2 - x1, 360.0))
 
 
-def generate_grid_metrics_MIDAS(
-    x, y, axis_units="degrees", Re=_default_Re, latlon_areafix=True
-):
+def generate_grid_metrics_MIDAS(x, y, axis_units="degrees", Re=_default_Re, latlon_areafix=True):
     nytot, nxtot = x.shape
     if axis_units == "m":
         metric = 1.0
@@ -791,9 +734,7 @@ def generate_grid_metrics_MIDAS(
     if latlon_areafix:
         sl = np.sin(lv)
         dx_i = mdist(x[:, 1:], x[:, :-1]) * PI_180
-        area = (Re ** 2) * (
-            (0.5 * (dx_i[1:, :] + dx_i[:-1, :])) * (sl[1:, :] - sl[:-1, :])
-        )
+        area = (Re ** 2) * ((0.5 * (dx_i[1:, :] + dx_i[:-1, :])) * (sl[1:, :] - sl[:-1, :]))
     else:
         area = 0.25 * ((dx[1:, :] + dx[:-1, :]) * (dy[:, 1:] + dy[:, :-1]))
     return dx, dy, area
@@ -805,15 +746,9 @@ def angle_x(x, y):
         raise Exception("Input arrays do not have the same shape!")
     angle_dx = np.zeros(x.shape)
     # The corrected version of angle_dx, in addition to including spherical metrics, is centered in the interior and one-sided at the grid edges
-    angle_dx[:, 1:-1] = np.arctan2(
-        y[:, 2:] - y[:, :-2], (x[:, 2:] - x[:, :-2]) * np.cos(y[:, 1:-1] * PI_180)
-    )
-    angle_dx[:, 0] = np.arctan2(
-        y[:, 1] - y[:, 0], (x[:, 1] - x[:, 0]) * np.cos(y[:, 0] * PI_180)
-    )
-    angle_dx[:, -1] = np.arctan2(
-        y[:, -1] - y[:, -2], (x[:, -1] - x[:, -2]) * np.cos(y[:, -1] * PI_180)
-    )
+    angle_dx[:, 1:-1] = np.arctan2(y[:, 2:] - y[:, :-2], (x[:, 2:] - x[:, :-2]) * np.cos(y[:, 1:-1] * PI_180))
+    angle_dx[:, 0]    = np.arctan2(y[:, 1] - y[:, 0], (x[:, 1] - x[:, 0]) * np.cos(y[:, 0] * PI_180))
+    angle_dx[:, -1]   = np.arctan2(y[:, -1] - y[:, -2], (x[:, -1] - x[:, -2]) * np.cos(y[:, -1] * PI_180))
     angle_dx = angle_dx / PI_180
     return angle_dx
 
@@ -830,9 +765,7 @@ def metrics_error(
     displaced_pole=-999,
     excluded_fraction=None,
 ):
-    exact_area = (
-        2 * np.pi * (Re ** 2) * np.abs(np.sin(lat2 * PI_180) - np.sin(lat1 * PI_180))
-    )
+    exact_area = (2 * np.pi * (Re ** 2) * np.abs(np.sin(lat2 * PI_180) - np.sin(lat1 * PI_180)))
     exact_lat_arc_length = np.abs(lat2 - lat1) * PI_180 * Re
     exact_lon_arc_length = np.cos(lat1 * PI_180) * 2 * np.pi * Re
     grid_lat_arc_length = np.sum(dy_[:, Ni // 4])
@@ -843,32 +776,18 @@ def metrics_error(
         # length of the fold
         grid_lon_arc_length2 = np.sum(dx_[-1, :])
         # This must be 4*grid_lat_arc_length
-        lon_arc2_error = (
-            100
-            * (grid_lon_arc_length2 / 4 - exact_lat_arc_length)
-            / exact_lat_arc_length
-        )
+        lon_arc2_error = 100* (grid_lon_arc_length2 / 4 - exact_lat_arc_length)/ exact_lat_arc_length
     area_error = 100 * (np.sum(area_) - exact_area) / exact_area
-    lat_arc_error = (
-        100 * (grid_lat_arc_length - exact_lat_arc_length) / exact_lat_arc_length
-    )
-    lon_arc_error = (
-        100 * (grid_lon_arc_length - exact_lon_arc_length) / exact_lon_arc_length
-    )
+    lat_arc_error = 100 * (grid_lat_arc_length - exact_lat_arc_length) / exact_lat_arc_length
+    lon_arc_error = 100 * (grid_lon_arc_length - exact_lon_arc_length) / exact_lon_arc_length
     if displaced_pole != -999:
         antipole = displaced_pole + Ni // 2
         if displaced_pole > Ni // 2:
             antipole = displaced_pole - Ni // 2
         grid_lat_arc_length = np.sum(dy_[:, displaced_pole]) + np.sum(dy_[:, antipole])
-        lat_arc_error = (
-            100
-            * (grid_lat_arc_length - 2.0 * exact_lat_arc_length)
-            / exact_lat_arc_length
-        )
+        lat_arc_error = 100 * (grid_lat_arc_length - 2.0 * exact_lat_arc_length)/ exact_lat_arc_length
     if excluded_fraction:
-        print(
-            "   Cannot estimate area and dy accuracies with excluded_fraction (doughnut)! "
-        )
+        print("   Cannot estimate area and dy accuracies with excluded_fraction (doughnut)! ")
     if bipolar:
         return area_error, lat_arc_error, lon_arc_error, lon_arc2_error
     else:
@@ -955,27 +874,14 @@ def generate_latlon_grid(
     llonSP = llon0 + np.arange(lni + 1) * llen_lon / float(lni)
     llatSP = llat0 + np.arange(lnj + 1) * llen_lat / float(lnj)
     if llatSP.shape[0] % 2 == 0 and ensure_nj_even:
-        print(
-            "   The number of j's is not even. Fixing this by cutting one row at south."
-        )
+        print("   The number of j's is not even. Fixing this by cutting one row at south.")
         llatSP = np.delete(llatSP, 0, 0)
 
     llamSP = np.tile(llonSP, (llatSP.shape[0], 1))
     lphiSP = np.tile(llatSP.reshape((llatSP.shape[0], 1)), (1, llonSP.shape[0]))
 
-    print(
-        "   generated regular lat-lon grid between latitudes ",
-        lphiSP[0, 0],
-        lphiSP[-1, 0],
-    )
+    print("   generated regular lat-lon grid between latitudes ", lphiSP[0, 0], lphiSP[-1, 0])
     print("   number of js=", lphiSP.shape[0])
-
-    #    h_i_inv=llen_lon*PI_180*np.cos(lphiSP*PI_180)/lni
-    #    h_j_inv=llen_lat*PI_180*np.ones(lphiSP.shape)/lnj
-    #    delsin_j = np.roll(np.sin(lphiSP*PI_180),shift=-1,axis=0) - np.sin(lphiSP*PI_180)
-    #    dx_h=h_i_inv[:,:-1]*_default_Re
-    #    dy_h=h_j_inv[:-1,:]*_default_Re
-    #    area=delsin_j[:-1,:-1]*_default_Re*_default_Re*llen_lon*PI_180/lni
 
     return llamSP, lphiSP
 
