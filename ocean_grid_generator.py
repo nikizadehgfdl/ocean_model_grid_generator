@@ -300,6 +300,11 @@ def phi_mercator(Ni, y):
     R = Ni / (2 * np.pi)
     return np.arctan(np.sinh(y / R)) * (180 / np.pi)  # Converted to degrees
 
+def d_phi_mercator_dy(Ni, y):
+    """Derivative of phi Equation (2) wrt y"""
+    R = Ni / (2 * np.pi)
+    return np.cosh(y/R)/(1.+(np.sinh(y / R))**2)/R
+
 
 def y_mercator_rounded(Ni, phi):
     y_float = y_mercator(Ni, phi)
@@ -1012,6 +1017,10 @@ def main(
     # MIDAS has nominal latitude range of Mercator grid     = 125 for 1/4 degree, 135 for 1/2 degree
     # Instead we use:
     phi_s_Merc, phi_n_Merc = -66.85954725, 64.05895973
+    #This choice results the same number of points as in the original MIDA-OM4p25 (sub)grids 
+    #MIDAS OM4p25 grid shape:(2160, 2881),  
+    #      j-extents: (SC60 0:59)     (SO220 60:279) (MERC1400  280:1679) (BPC481 1680:2160)
+    #    lat extents: (-80.43,-78.04),(-78.0,-66.91),(-66.86,64.0040),    (64.06,90.0)
     if refineR == 2:
         # phi_s_Merc, phi_n_Merc = -68.05725376601046, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
         # shift_equator_to_u_point= False
@@ -1046,6 +1055,7 @@ def main(
         Nj_ncap = 119 * refineS
     if refineR == 1 and enhanced_equatorial:
         Nj_ncap = 154  # SPEAR
+
     ###
     # South cap
     ###
@@ -1108,24 +1118,17 @@ def main(
         # The phi resolution in the first and last row of Mercator grid along the symmetry meridian
         DeltaPhiMerc_so = phiMerc[1, Ni // 4] - phiMerc[0, Ni // 4]
         DeltaPhiMerc_no = phiMerc[-1, Ni // 4] - phiMerc[-2, Ni // 4]
-        # Start lattitude from dy above the last Mercator grid
-        lat0_bp = phiMerc[-1, Ni // 4] + DeltaPhiMerc_no
-        if refineR == 1 and enhanced_equatorial:
-            lat0_bp = phiMerc[-1, Ni // 4]  # SPEAR
+        # The bopolar grid should start from the same lattitude that Mercator ends.
+        # Then when we stitch the two subgrids we should drop the x,y,dx,angle from one of the two.
+        # This way we get a continous dy and area.
+        lat0_bp = phiMerc[-1, Ni // 4] 
         if match_dy:
-            # The bopolar grid should start from the same lattitude that Mercator ends.
-            # Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
-            # This way we get a continous dy and area.
-            lat0_bp = phiMerc[-1, Ni // 4]
             # Determine the number of bipolar cap grid point in the y direction such that the y resolution
             # along symmetry meridian is a constant and is equal to (continuous with) the last Mercator dy.
             # Note that int(0.5+x) is used to return the nearest integer to a float with deterministic
             # behavior for middle points.
             # Note that int(0.5+x) is equivalent to math.floor(0.5+x)
-            Nj_ncap = int(
-                0.5 + (90.0 - lat0_bp) / DeltaPhiMerc_no
-            )  # Impose boundary condition for smooth dy
-
+            Nj_ncap = int(0.5 + (90.0 - lat0_bp) / DeltaPhiMerc_no)  # Impose boundary condition for smooth dy
             # Make the last SO grid point a (Mercator) step below the first Mercator lattitude.
             # lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
             # Niki: I think this is wrong!
@@ -1457,131 +1460,92 @@ def main(
                 areaSO = areaSO[jcut_SO:, :]
                 angleSO = angleSO[jcut_SO:, :]
 
-        if match_dy or not "all" in grids:
-            if hasSC and hasSO:
-                x1 = np.concatenate((lamSC[:-1, :], lamSO), axis=0)
-                y1 = np.concatenate((phiSC[:-1, :], phiSO), axis=0)
-                dx1 = np.concatenate((dxSC[:-1, :], dxSO), axis=0)
-                angle1 = np.concatenate((angleSC[:-1, :], angleSO), axis=0)
-                #
-                dy1 = np.concatenate((dySC, dySO), axis=0)
-                area1 = np.concatenate((areaSC, areaSO), axis=0)
-                cats = cats + 1
-            elif hasSO:  # if the whole SC was cut
-                x1 = lamSO
-                y1 = phiSO
-                dx1 = dxSO
-                dy1 = dySO
-                area1 = areaSO
-                angle1 = angleSO
-
-            # Join the Mercator grid
-            if hasSO and hasMerc:
-                x2 = np.concatenate((x1[:-1, :], lamMerc), axis=0)
-                y2 = np.concatenate((y1[:-1, :], phiMerc), axis=0)
-                dx2 = np.concatenate((dx1[:-1, :], dxMerc), axis=0)
-                angle2 = np.concatenate((angle1[:-1, :], angleMerc), axis=0)
-                #
-                dy2 = np.concatenate((dy1, dyMerc), axis=0)
-                area2 = np.concatenate((area1, areaMerc), axis=0)
-            elif hasMerc:
-                x2 = lamMerc
-                y2 = phiMerc
-                dx2 = dxMerc
-                dy2 = dyMerc
-                angle2 = angleMerc
-                area2 = areaMerc
-            else:
-                x2 = x1
-                y2 = y1
-                dx2 = dx1
-                dy2 = dy1
-                angle2 = angle1
-                area2 = area1
-
+        if hasSC and hasSO:
+            x1 = np.concatenate((lamSC[:-1, :], lamSO), axis=0)
+            y1 = np.concatenate((phiSC[:-1, :], phiSO), axis=0)
+            dx1 = np.concatenate((dxSC[:-1, :], dxSO), axis=0)
+            angle1 = np.concatenate((angleSC[:-1, :], angleSO), axis=0)
+            #
+            dy1 = np.concatenate((dySC, dySO), axis=0)
+            area1 = np.concatenate((areaSC, areaSO), axis=0)
             cats = cats + 1
-            # Join the norhern bipolar cap grid
-            if hasBP:
-                x3 = np.concatenate((x2[:-1, :], lamBP), axis=0)
-                y3 = np.concatenate((y2[:-1, :], phiBP), axis=0)
-                dx3 = np.concatenate((dx2[:-1, :], dxBP), axis=0)
-                angle3 = np.concatenate((angle2[:-1, :], angleBP), axis=0)
-                #
-                dy3 = np.concatenate((dy2, dyBP), axis=0)
-                area3 = np.concatenate((area2, areaBP), axis=0)
-                dy3_ = np.roll(y3[:, Ni // 4], shift=-1, axis=0) - y3[:, Ni // 4]
-                if np.any(dy3_ == 0):
-                    raise Exception(
-                        "lattitude array has repeated values along symmetry meridian!"
-                    )
-            else:
-                x3 = x2
-                y3 = y2
-                dx3 = dx2
-                dy3 = dy2
-                angle3 = angle2
-                area3 = area2
+        elif hasSO:  # if the whole SC was cut
+            x1 = lamSO
+            y1 = phiSO
+            dx1 = dxSO
+            dy1 = dySO
+            area1 = areaSO
+            angle1 = angleSO
 
+        # Join the Mercator grid
+        if hasSO and hasMerc:
+            x2 = np.concatenate((x1[:-1, :], lamMerc), axis=0)
+            y2 = np.concatenate((y1[:-1, :], phiMerc), axis=0)
+            dx2 = np.concatenate((dx1[:-1, :], dxMerc), axis=0)
+            angle2 = np.concatenate((angle1[:-1, :], angleMerc), axis=0)
+            #
+            dy2 = np.concatenate((dy1, dyMerc), axis=0)
+            area2 = np.concatenate((area1, areaMerc), axis=0)
+        elif hasMerc:
+            x2 = lamMerc
+            y2 = phiMerc
+            dx2 = dxMerc
+            dy2 = dyMerc
+            angle2 = angleMerc
+            area2 = areaMerc
         else:
-            # Note: angle variable has the same shape as x1,y1,dx1 and should be treated just like them.
-            #      I think the way is treated below unlike them is a bug, but fixing the bug will change the produced grids.
-            if hasSC and hasSO:
-                x1 = np.concatenate((lamSC, lamSO[1:, :]), axis=0)
-                y1 = np.concatenate((phiSC, phiSO[1:, :]), axis=0)
-                dx1 = np.concatenate((dxSC, dxSO[1:, :]), axis=0)
-                dy1 = np.concatenate((dySC, dySO), axis=0)
-                area1 = np.concatenate((areaSC, areaSO), axis=0)
-                angle1 = np.concatenate((angleSC[:-1, :], angleSO[:-1, :]), axis=0)
-                # Join the Mercator grid
-                x2 = np.concatenate((x1, lamMerc[1:, :]), axis=0)
-                y2 = np.concatenate((y1, phiMerc[1:, :]), axis=0)
-                dx2 = np.concatenate((dx1, dxMerc[1:, :]), axis=0)
-                dy2 = np.concatenate((dy1, dyMerc), axis=0)
-                area2 = np.concatenate((area1, areaMerc), axis=0)
-                angle2 = np.concatenate((angle1, angleMerc[:-1, :]), axis=0)
-            else:
-                x2 = lamMerc
-                y2 = phiMerc
-                dx2 = dxMerc
-                dy2 = dyMerc
-                angle2 = angleMerc[:-1, :]
-                area2 = areaMerc
-            # Join the norhern bipolar cap grid
-            x3 = np.concatenate((x2, lamBP[1:, :]), axis=0)
-            y3 = np.concatenate((y2, phiBP[1:, :]), axis=0)
-            dx3 = np.concatenate((dx2, dxBP[1:, :]), axis=0)
+            x2 = x1
+            y2 = y1
+            dx2 = dx1
+            dy2 = dy1
+            angle2 = angle1
+            area2 = area1
+
+        cats = cats + 1
+        # Join the norhern bipolar cap grid
+        if hasBP:
+            x3 = np.concatenate((x2[:-1, :], lamBP), axis=0)
+            y3 = np.concatenate((y2[:-1, :], phiBP), axis=0)
+            dx3 = np.concatenate((dx2[:-1, :], dxBP), axis=0)
+            angle3 = np.concatenate((angle2[:-1, :], angleBP), axis=0)
+            #
             dy3 = np.concatenate((dy2, dyBP), axis=0)
             area3 = np.concatenate((area2, areaBP), axis=0)
-            angle3 = np.concatenate((angle2, angleBP), axis=0)
+            dy3_ = np.roll(y3[:, Ni // 4], shift=-1, axis=0) - y3[:, Ni // 4]
+            if np.any(dy3_ == 0):
+                raise Exception(
+                    "lattitude array has repeated values along symmetry meridian!"
+                )
+        else:
+            x3 = x2
+            y3 = y2
+            dx3 = dx2
+            dy3 = dy2
+            angle3 = angle2
+            area3 = area2
 
-        dy3_ = np.roll(y3[:, Ni // 4], shift=-1, axis=0) - y3[:, Ni // 4]
-        if np.any(dy3_ == 0):
-            print(
-                "WARNING: lattitude array has repeated values along symmetry meridian! Try option --match_dy"
+    if write_subgrid_files:
+        if hasSC:
+            write_nc(
+                lamSC,
+                phiSC,
+                dxSC,
+                dySC,
+                areaSC,
+                angleSC,
+                axis_units="degrees",
+                fnam=gridfilename + "SC.nc",
+                description=desc,
+                history=hist,
+                source=source,
+                debug=debug,
             )
-
-        if write_subgrid_files:
-            if hasSC:
-                write_nc(
-                    lamSC,
-                    phiSC,
-                    dxSC,
-                    dySC,
-                    areaSC,
-                    angleSC,
-                    axis_units="degrees",
-                    fnam=gridfilename + "SC.nc",
-                    description=desc,
-                    history=hist,
-                    source=source,
-                    debug=debug,
-                )
-            elif Nj_scap != 0:
-                print(
-                    "There remained no South Pole cap grid because of the number of rows cut= ",
-                    jcut,
-                    lamSC.shape[0],
-                )
+        elif Nj_scap != 0:
+            print(
+                "There remained no South Pole cap grid because of the number of rows cut= ",
+                jcut,
+                lamSC.shape[0],
+            )
 
         # write the whole grid file
         desc = desc + "It consists of; "
