@@ -1010,7 +1010,9 @@ def main(
     lenlon = 360  # global longitude range
     lon0 = -300.0  # Starting longitude of the map
     Ni = int(refineR * refineS * lenlon)
-    ###
+    # To get the same number of points as existing 1/4 & 1/8 degree grids that were generated with MIDAS
+    Nj_SO = int(refineR * 55)
+   ###
     ###Mercator grid
     ###
     # MIDAS has nominal starting latitude for Mercator grid = -65 for 1/4 degree, -70 for 1/2 degree
@@ -1021,30 +1023,12 @@ def main(
     #MIDAS OM4p25 grid shape:(2160, 2881),  
     #      j-extents: (SC60 0:59)     (SO220 60:279) (MERC1400  280:1679) (BPC481 1680:2160)
     #    lat extents: (-80.43,-78.04),(-78.0,-66.91),(-66.86,64.0040),    (64.06,90.0)
-    if refineR == 2:
-        # phi_s_Merc, phi_n_Merc = -68.05725376601046, 65.0 #These give a 1/2 degree enhanced equatorial close to MIDAS result
-        # shift_equator_to_u_point= False
+    if refineR == 2:  #Closest to OM4p5 grid
+        #These give a 1/2 degree enhanced equatorial very close to MIDAS result
         phi_s_Merc, phi_n_Merc = -68.0, 65.0
-    if refineR == 1 and enhanced_equatorial:  # Closest to SPEAR grid
+    if refineR == 1 and enhanced_equatorial:  #Closest to SPEAR grid
         # shift_equator_to_u_point=True
         phi_s_Merc, phi_n_Merc = -77.8, 60.0
-    ###
-    # Southern Ocean grid
-    ###
-    lat0_SO = -78.0  # Starting lower lat of Southern Ocean grid
-    if south_cap_lat > -90:
-        lat0_SO = south_cap_lat
-    latUp_SO = phi_s_Merc
-    if south_ocean_upper_lat > -90:
-        latUp_SO = south_ocean_upper_lat
-    lenlat_SO = latUp_SO - lat0_SO
-    deltaPhiSO = 1.0 / refineR / refineS
-    # To get the same number of points as existing 1/2 and 1/4 degree grids that were generated with MIDAS
-    Nj_SO = int(refineR * 55)
-    if refineR == 2:
-        Nj_SO = 54 * refineS + 1
-    if refineR == 1 and enhanced_equatorial:
-        Nj_SO = 0
     ###
     # Bipolar cap
     ###
@@ -1063,14 +1047,14 @@ def main(
     Nj_scap = int(refineR * 40)
     if no_south_cap:
        Nj_scap = 0
+    if refineR == 2 and enhanced_equatorial:  # OM4p5
+        Nj_scap = 0   
     if refineR == 1 and enhanced_equatorial:  # SPEAR
         Nj_scap = 0
     # Refine the grid by a factor and then exclude the inner circle corresponding to that factor
     # These factors are heuristic and we adjust them to get a grid with the same number of points
     # as the existing 1/4 degree grid of OM4p25
     Nj_scap = Nj_scap * 7 // 4
-
-    lat0_SC = lat0_SO
 
     if "mercator" in grids or "all" in grids:
         lamMerc, phiMerc = generate_mercator_grid(
@@ -1129,18 +1113,6 @@ def main(
             # behavior for middle points.
             # Note that int(0.5+x) is equivalent to math.floor(0.5+x)
             Nj_ncap = int(0.5 + (90.0 - lat0_bp) / DeltaPhiMerc_no)  # Impose boundary condition for smooth dy
-            # Make the last SO grid point a (Mercator) step below the first Mercator lattitude.
-            # lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
-            # Niki: I think this is wrong!
-            # The SO grid should end at the same lattitude that Mercator starts.
-            # Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
-            # This way we get a continous dy and area.
-            lenlat_SO = phiMerc[0, Ni // 4] - lat0_SO
-            # Determine the number of grid point in the y direction such that the y resolution is equal to
-            # (continuous with) the first Mercator dy.
-            Nj_SO = int(
-                0.5 + lenlat_SO / DeltaPhiMerc_so
-            )  # Make the resolution continious with the Mercator at joint
 
     ###
     ###Northern bipolar cap
@@ -1182,11 +1154,38 @@ def main(
                 debug=debug,
             )
 
+    ###
+    ###Southern Ocean grid
+    ###
+    lat0_SO = -78.0  # Starting lower lat of Southern Ocean grid
+    if south_cap_lat > -90:
+        lat0_SO = south_cap_lat
+    latUp_SO = phiMerc[0, Ni // 4]
+    if south_ocean_upper_lat > -90:
+        latUp_SO = south_ocean_upper_lat
+    lenlat_SO = latUp_SO - lat0_SO
+    deltaPhiSO = 1.0 / refineR / refineS
+    if refineR == 2 and enhanced_equatorial: #Closest to OM4p5 grid
+        Nj_SO = 109
+    if refineR == 1 and enhanced_equatorial: #Closest to SPEAR grid
+        Nj_SO = 0
+    
     if (Nj_SO != 0) and ("so" in grids or "all" in grids):
         hasSO=True
-        ###
-        ###Southern Ocean grid
-        ###
+        if match_dy:
+            # Make the last SO grid point a (Mercator) step below the first Mercator lattitude.
+            # lenlat_SO = phiMerc[0,Ni//4] - DeltaPhiMerc_so - lat0_SO #Start from a lattitude to smooth out dy.
+            # Niki: I think this is wrong!
+            # The SO grid should end at the same lattitude that Mercator starts.
+            # Then when we combine the two grids we should drop the x,y,dx,angle from one of the two.
+            # This way we get a continous dy and area.
+            lenlat_SO = phiMerc[0, Ni // 4] - lat0_SO
+            # Determine the number of grid point in the y direction such that the y resolution is equal to
+            # (continuous with) the first Mercator dy.
+            Nj_SO = int(
+                0.5 + lenlat_SO / DeltaPhiMerc_so
+            )  # Make the resolution continious with the Mercator at joint
+            
         lamSO, phiSO = generate_latlon_grid(
             Ni,
             Nj_SO,
@@ -1208,8 +1207,7 @@ def main(
             metrics_error(dxSO, dySO, areaSO, Ni, phiSO[0, 0], phiSO[-1, 0]),
         )
 
-        deltaPhiSO = phiSO[1, Ni // 4] - phiSO[0, Ni // 4]
-        lat0_SC = phiSO[0, Ni // 4] - deltaPhiSO
+        lat0_SC = phiSO[0, Ni // 4]
         # The above heuristics produce a displaced pole grid with a nominal resolution
         # different from the rest of the grid!
         # To get the nominal resolution right  we must instead make the resolution continuous across the joint

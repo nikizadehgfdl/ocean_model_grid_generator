@@ -5,6 +5,7 @@ TARGS = ocean_hgrid_res4.0.nc \
         ocean_hgrid_res0.5.nc \
         ocean_hgrid_res0.5_equenh.nc \
         ocean_hgrid_res0.25.nc \
+	ocean_hgrid_res0.25_om5proto.nc \
         ocean_hgrid_res0.125.nc 
 
 #Note: Github Travis cannot make the higher res grids below and errors out with "MemoryError"
@@ -31,14 +32,16 @@ ocean_hgrid_res1.0.nc:
 ocean_hgrid_res0.5.nc: 
 	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.5.nc -r 2    --write_subgrid_files --no_changing_meta 
 ocean_hgrid_res0.5_equenh.nc: 
-	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --south_cutoff_row 130 --no_changing_meta --write_subgrid_files --enhanced_equatorial=4
+	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.5_equenh.nc -r 2 --enhanced_equatorial=4 --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.25.nc:
 	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.25.nc -r 4 --r_dp 0.2 --south_cutoff_row 83 --write_subgrid_files --no_changing_meta
+ocean_hgrid_res0.25_om5proto.nc:
+	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.25_om5proto.nc -r 4 --lon_dp 90.0 --lat_dp -90.0 --south_cap_lat -70.0  --exfracdp 0.0  --south_cutoff_row 21 --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.125.nc:
 	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.125.nc -r 8 --r_dp 0.2 --south_cutoff_row 5 --match_dy --ensure_nj_even --write_subgrid_files --no_changing_meta
 
 
-hash.md5: | $(TARGS)
+hash.md5.gfdl-pan105: | $(TARGS)
 	md5sum $(TARGS) > $@
 	cat $@
 
