@@ -1,4 +1,4 @@
-TOOL  = ../ocean_grid_generator.py
+TOOL  = /home/Niki.Zadeh/ocean_model_grid_generator/ocean_grid_generator.py
 
 TARGS = ocean_hgrid_res4.0.nc \
         ocean_hgrid_res1.0.nc \
@@ -36,9 +36,9 @@ ocean_hgrid_res0.5_equenh.nc:
 ocean_hgrid_res0.25.nc:
 	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.25.nc -r 4 --r_dp 0.2 --south_cutoff_row 83 --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.25_om5proto.nc:
-	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.25_om5proto.nc -r 4 --lon_dp 90.0 --lat_dp -90.0 --south_cap_lat -70.0  --exfracdp 0.0  --south_cutoff_row 21 --write_subgrid_files --no_changing_meta
+	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.25_om5proto.nc -r 4 --south_ocean_lower_lat -88.57 --match_dy so  --no_south_cap --write_subgrid_files --no_changing_meta
 ocean_hgrid_res0.125.nc:
-	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.125.nc -r 8 --r_dp 0.2 --south_cutoff_row 5 --match_dy --ensure_nj_even --write_subgrid_files --no_changing_meta
+	time $(TOOL) $(DEBUG) -f ocean_hgrid_res0.125.nc -r 8 --r_dp 0.2 --south_cutoff_row 5 --match_dy bp so p125sc --ensure_nj_even --write_subgrid_files --no_changing_meta
 
 
 hash.md5.gfdl-pan105: | $(TARGS)
