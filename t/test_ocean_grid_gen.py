@@ -42,6 +42,8 @@ class TestOGG:
             == "0bc8e50b7d4110fcfb148f9f9590cf3c5e6c2d699b9c5519600aea7cc9483381" #PAN
             or hashfile(outfile)
             == "7e04457b4411260341f304a5182ec7f289ddb2724021e2825751f9994e23a6ed" #githubCI
+            or hashfile(outfile)
+            == "8cfd0f521bdbbc2d67729d94cc98d0b079e218cc045a7ef31335262704eabcf9" #githubCI
         )
 
     def test_hgrid_res1_0(self, tmpdir):
@@ -65,6 +67,8 @@ class TestOGG:
             == "6fed3c3f57894ea5e635c5412fdcdef90f44576908b10a894f06035c38159f9f" #PAN 
             or hashfile(outfile)
             == "ec24bbb7fd8b076d4d566777d2a924c4c6ac8f45bdf5b55c94eaeaa12ab07cbf" #githubCI
+            or hashfile(outfile)
+            == "48cd453596a5fdfbbf2303b34640c7b670986f3b62dbe2f21757030fb680c8e9" #githubCI
         )
 
     def test_hgrid_res0_5(self, tmpdir):
@@ -86,6 +90,8 @@ class TestOGG:
             == "cadb254616cee8c0fd8ffc52360de7d5b23ef298397e2873151b4c7e55d999b7" #PAN
             or hashfile(outfile)
             == "b2e8bbf65da5aa1de011119a269f4b3f236bf62ebe14778f1f458b552a1c1a9d" #githubCI
+            or hashfile(outfile)
+            == "116dedceaa2366aa5b09f9fb6229cfd542633589ff54824326ca8867401d781e" #githubCI
         )
 
     def test_hgrid_res0_5_equenh(self, tmpdir):
@@ -109,6 +115,8 @@ class TestOGG:
             == "26cee1438eb2a5188ef708528b53fca07bf2312b6cfd92f8e76dbf7f6c6ecaa0" #PAN
             or hashfile(outfile)
             == "30a040b8fbdf0683cc50d8ac2be841bb81f3f681e3b0c1a274f841e6fbd47d44" #githubCI
+            or hashfile(outfile)
+            == "3bccf46dad13e48204fea1afd78fb29e0ec58c33cd6eb6a6fd9bb8f050a74fcd" #githubCI
         )
 
     def test_hgrid_res0_25(self, tmpdir):
@@ -136,7 +144,11 @@ class TestOGG:
             or hashfile(outfile)
             == "2d7840344aa356feb282d352bf21cce8832947b7989534290bd24d30dc561b70"  # github,gfdl-pan202
             or hashfile(outfile)
+            == "837c133d9ebcbb75b81624f2258a569330c514d4b501abfcd69fa57dbed120f0"  # gfdl-ws
+            or hashfile(outfile)
             == "adbe2e67109d49a407ce9c3e52c4f670da54436f5bfb58d5af5b7cef0e672e34"  # githubCI
+            or hashfile(outfile)
+            == "7f56fc59e3b18ec35a5028d2fc7bd71f97898e2151f0f89d2bd634fdcdc74be0"  # githubCI
         )
 
     def test_hgrid_res0_25_om5proto(self, tmpdir):
@@ -156,6 +168,8 @@ class TestOGG:
             == "0dd436ac1de339c447bd53a47f54cdff153a73a31e782bee59b1699209aa6b0d"  # gfdl-pan106,pan105
             or hashfile(outfile)
             == "1a0c3ca0e5b71ebdb8c68c63b2134c48a4bc8d9b9c9ba32f7298171a315d9508"  # githubCI
+            or hashfile(outfile)
+            == "8e53ff6892691852fdf5c9679ae26e93a68a42029bfb71dfb8c052d30f016e78"  # githubCI
         )
 
 
