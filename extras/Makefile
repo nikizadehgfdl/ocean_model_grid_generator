@@ -1,4 +1,4 @@
-TOOL  = /home/Niki.Zadeh/ocean_model_grid_generator/ocean_grid_generator.py
+TOOL  = ../ocean_grid_generator.py
 
 TARGS = ocean_hgrid_res4.0.nc \
         ocean_hgrid_res1.0.nc \
