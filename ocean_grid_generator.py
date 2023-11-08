@@ -848,7 +848,7 @@ def generate_latlon_grid(lni, lnj, llon0, llen_lon, llat0, llen_lat, ensure_nj_e
 
 def usage():
     print(
-        "ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --match_dy bp so --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --grids=sc]"
+        "ocean_grid_generator.py -f <output_grid_filename> -r <inverse_degrees_resolution> [--rdp=<displacement_factor/0.2> --exfracdp=0.5 --south_cutoff_ang=<degrees_south_to_start> --south_cutoff_row=<rows_south_to_cut> --match_dy bp so --even_j --plot --write_subgrid_files --enhanced_equatorial --no-metrics --grids=sc]"
     )
 
 
@@ -1461,7 +1461,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--r_dp",type=float,required=False,default=0.0,
                         help="displacement factor/0.2 for the displaced south pole, do not specify both r_dp and lat_dp!")
-
+    parser.add_argument("--exfracdp",type=float,required=False,default=0.49,
+                        help="exclusion factor that determines the size of the hole arount SP!")
+    
     parser.add_argument("--lon_dp",type=float,required=False,default=80.0,
                         help="longitude of the displaced south pole")
 
