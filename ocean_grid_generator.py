@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import numpypi.numpypi_series as np
 
-# import numpy as np
+import numpy
 import argparse
 import sys, getopt
 import datetime, os, subprocess
@@ -308,7 +308,7 @@ def d_phi_mercator_dy(Ni, y):
 
 def y_mercator_rounded(Ni, phi):
     y_float = y_mercator(Ni, phi)
-    return (np.sign(y_float) * np.round_(np.abs(y_float))).astype(int)
+    return (np.sign(y_float) * numpy.round(np.abs(y_float))).astype(int)
 
 
 def generate_mercator_grid(Ni, phi_s, phi_n, lon0_M, lenlon_M, refineR,

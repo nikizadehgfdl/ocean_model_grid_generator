@@ -1,33 +1,12 @@
-10/29/2021
+07/31/2024
 ----------
 The md5 checksum hashes were obtained by using the following python setup
 
-export PYTHONPATH="/net2/nnz/opt/miniconda/lib/python3.8/site-packages"; export PATH="/net2/nnz/opt/miniconda/bin:$PATH"; export HDF5_USE_FILE_LOCKING=FALSE ; . activate om4labs
+export PATH="/net2/nnz/opt/miniconda/bin:$PATH"; export HDF5_USE_FILE_LOCKING=FALSE ; . activate platforms
 
-Currenly the checksum don't match between gfdl-ws and gfdl-pan for 1/4 and 1/8 degree grids (ocean_hgrid_res0.25.nc and ocean_hgrid_res0.125.nc )
+The tests were run on gfdl-ws , gfdl-pan-* using the same python executable and environment as shown above!
 
-#################################################
-OLD, deprecated
-#################################################
-#On gfdl pan the following were checked identical
+There seems  to be at least two sets of different answers for two sets of platforms:
+- Checksums match between gfdl-ws , gfdl-pan-202 , awscloud, 
+- Checksums match between gfdl-pan-10* , gfdl amdbox 
 
-#To reproduce MIDAS grids:
-#OM4p25
-module load python/2.7.3_workstation
-/work/Niki.Zadeh/grid_generation/ocean_grid_generator.py -f ocean_hgrid_res0.25_MIDAS.nc -r 4 --south_cutoff_row 81 --reproduce_MIDAS_grids --write_subgrid_files
-nccmp -d ocean_hgrid_res0.25_MIDAS.nc  /archive/gold/datasets/OM4_025/mosaic.v20170622.unpacked/ocean_hgrid.nc
-
-#OM4p5
-module swap python/2.7.3_workstation
-/work/Niki.Zadeh/grid_generation/ocean_grid_generator.py -f ocean_hgrid_res0.5_MIDAS.nc -r 2 --rdp 0 --south_cutoff_row 81 --reproduce_MIDAS_grids --write_subgrid_files
-nccmp -d ocean_hgrid_res0.5_MIDAS.nc  /archive/gold/datasets/OM4_05/mosaic_ocean.v20180227.unpacked/ocean_hgrid.nc    
-
-#To reproduce 1/8 degree JRA grid
-module swap python/3.6.4    #Note the version
-/work/Niki.Zadeh/grid_generation/ocean_grid_generator.py -f ocean_hgrid_res0.125_old.nc -r 8 --write_subgrid_files --reproduce_old8_grids --write_subgrid_files
-nccmp -d ocean_hgrid_res0.125_old.nc /archive/Niki.Zadeh/input/xanadu/OM4p125_grid/unpacked/ocean_hgrid.nc
-
-#On gfdl workstation I get
-#nccmp -d ocean_hgrid_res0.125_old.nc  /archive/Niki.Zadeh/input/xanadu/OM4p125_grid/unpacked/ocean_hgrid.nc
-#DIFFER : VARIABLE : y : POSITION : 1 1362 : VALUES : -83.4759 <> -83.4759
-#This means something has changed in my python envoirons since I produced that grid in July2018

@@ -1,7 +1,6 @@
-#works for gfdl-ws, pan106 
-0ecf1226cda789e225bfa65edadc509c  ocean_hgrid_res4.0.nc
-f49fd3bdbfe4c4764802c591341b1ea2  ocean_hgrid_res1.0.nc
-01d0bfa698d16cec35320c5eaea58a48  ocean_hgrid_res0.5.nc
-cdbe7784f00a0ca8139da4019a961f89  ocean_hgrid_res0.5_equenh.nc
-e105c3f0ca219299015065178c18b998  ocean_hgrid_res0.25.nc
-b382087f5259eaad3fb9a0019eccce43  ocean_hgrid_res0.125.nc
+ae4edcf1e642e8814f6d251b794502ab  ocean_hgrid_res4.0.nc
+0e0e0516de806e3e7eafe843c91cd0b6  ocean_hgrid_res1.0.nc
+40ec628816f345f7f32bd083b1daed7a  ocean_hgrid_res0.5.nc
+e05ad585e54bced814792957f2aa64c8  ocean_hgrid_res0.5_equenh.nc
+5982d645b30fda55851ab702ed154cbb  ocean_hgrid_res0.25.nc
+ade918163ce229ab4bcec67950f58421  ocean_hgrid_res0.25_om5proto.nc
